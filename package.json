@@ -1,0 +1,13 @@
+{
+    "name": "dairy-inventory",
+    "private": true,
+    "scripts": {
+        "server": "npm --prefix server run dev",
+        "client": "npm --prefix client run dev",
+        "dev": "concurrently \"npm run server\" \"npm run client\"",
+        "install:all": "npm --prefix server install && npm --prefix client install"
+    },
+    "dependencies": {
+        "concurrently": "^8.0.1"
+    }
+}

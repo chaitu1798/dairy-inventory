@@ -1,5 +1,5 @@
 import express from 'express';
-import cors from 'cors';
+import cors, { CorsOptionsDelegate } from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import productRoutes from './routes/products';
@@ -19,20 +19,21 @@ const allowedOrigins = [
     process.env.FRONTEND_URL // Optional: set this in your backend environment variables
 ].filter((origin): origin is string => Boolean(origin));
 
-app.use(cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+const corsOptionsDelegate: CorsOptionsDelegate = (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
 
-        if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+        callback(null, true);
+    } else {
+        callback(new Error('Not allowed by CORS'));
+    }
+};
+
+app.use(cors({
+    origin: corsOptionsDelegate,
     credentials: true
 }));
-
 
 app.use(express.json());
 
@@ -59,9 +60,9 @@ app.get('/supabase-test', async (req, res) => {
 // Initialize calendar months for reports
 const initCalendar = async () => {
     const startDate = new Date();
-    startDate.setFullYear(startDate.getFullYear() - 2); // Start from 2 years ago
+    startDate.setFullYear(startDate.getFullYear() - 2);
     const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1); // Up to next year
+    endDate.setFullYear(endDate.getFullYear() + 1);
 
     const { error } = await supabase.rpc('populate_calendar_months', {
         start_date: startDate.toISOString(),

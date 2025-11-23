@@ -19,6 +19,7 @@ const auth_1 = __importDefault(require("./routes/auth"));
 const products_1 = __importDefault(require("./routes/products"));
 const transactions_1 = __importDefault(require("./routes/transactions"));
 const reports_1 = __importDefault(require("./routes/reports"));
+const waste_1 = __importDefault(require("./routes/waste"));
 const supabase_1 = require("./supabase");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -66,6 +67,7 @@ app.use('/auth', auth_1.default);
 app.use('/products', products_1.default);
 app.use('/', transactions_1.default); // /purchases, /sales, /expenses
 app.use('/reports', reports_1.default);
+app.use('/waste', waste_1.default);
 app.get('/supabase-test', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { data, error } = yield supabase_1.supabase.from('products').select('count', { count: 'exact', head: true });
     if (error) {

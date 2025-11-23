@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import api from '../../../utils/api';
-import { TrendingUp, ShoppingCart, DollarSign, Package, Download } from 'lucide-react';
+import { TrendingUp, ShoppingCart, DollarSign, Package, Download, Trash2 } from 'lucide-react';
 
 export default function DailyReportPage() {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -29,8 +29,8 @@ export default function DailyReportPage() {
         if (!stats) return;
 
         const csvContent = [
-            ['Date', 'Total Sales', 'Total Purchases', 'Total Expenses', 'Net Profit'],
-            [date, stats.total_sales, stats.total_purchases, stats.total_expenses, stats.net]
+            ['Date', 'Total Sales', 'Total Purchases', 'Total Expenses', 'Total Waste', 'Profit'],
+            [date, stats.total_sales, stats.total_purchases, stats.total_expenses, stats.total_waste, stats.profit]
         ].map(e => e.join(",")).join("\n");
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -94,7 +94,7 @@ export default function DailyReportPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 <StatCard
                     title="Total Sales"
                     value={stats?.total_sales}
@@ -117,14 +117,50 @@ export default function DailyReportPage() {
                     delay={200}
                 />
                 <StatCard
-                    title="Net Profit"
-                    value={stats?.net}
+                    title="Total Waste"
+                    value={stats?.total_waste}
+                    icon={Trash2}
+                    gradient="bg-gradient-to-br from-orange-500 to-orange-700"
+                    delay={250}
+                />
+                <StatCard
+                    title="Profit"
+                    value={stats?.profit}
                     icon={Package}
-                    gradient={stats?.net >= 0
+                    gradient={stats?.profit >= 0
                         ? "bg-gradient-to-br from-indigo-500 to-indigo-700"
-                        : "bg-gradient-to-br from-orange-500 to-orange-700"}
+                        : "bg-gradient-to-br from-red-600 to-red-800"}
                     delay={300}
                 />
+            </div>
+
+            {/* Profit Breakdown */}
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Profit Calculation</h2>
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center pb-2">
+                        <span className="text-gray-600">Sales Revenue</span>
+                        <span className="font-semibold text-green-600">+₹{stats?.total_sales?.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-2 border-t pt-2">
+                        <span className="text-gray-600">Purchases</span>
+                        <span className="font-semibold text-red-600">-₹{stats?.total_purchases?.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-2">
+                        <span className="text-gray-600">Expenses</span>
+                        <span className="font-semibold text-red-600">-₹{stats?.total_expenses?.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-2">
+                        <span className="text-gray-600">Waste/Loss</span>
+                        <span className="font-semibold text-red-600">-₹{stats?.total_waste?.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-3 border-t-2 border-gray-300">
+                        <span className="text-lg font-bold text-gray-900">Net Profit</span>
+                        <span className={`text-2xl font-bold ${stats?.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            ₹{stats?.profit?.toFixed(2)}
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
     );

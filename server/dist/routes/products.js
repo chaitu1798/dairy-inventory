@@ -19,10 +19,10 @@ router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     res.json(data);
 }));
 router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { name, category, unit, selling_price, cost_price, min_stock } = req.body;
+    const { name, category, unit, selling_price, cost_price, min_stock, track_expiry, expiry_days } = req.body;
     const { data, error } = yield supabase_1.supabase
         .from('products')
-        .insert([{ name, category, unit, selling_price, cost_price, min_stock }])
+        .insert([{ name, category, unit, selling_price, cost_price, min_stock, track_expiry, expiry_days }])
         .select();
     if (error)
         return res.status(400).json({ error: error.message });

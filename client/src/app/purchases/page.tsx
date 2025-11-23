@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Plus } from 'lucide-react';
+import { Plus, Calendar } from 'lucide-react';
 
 export default function PurchasesPage() {
     const [products, setProducts] = useState<any[]>([]);
@@ -10,13 +10,30 @@ export default function PurchasesPage() {
         product_id: '',
         quantity: '',
         price: '',
-        purchase_date: new Date().toISOString().split('T')[0]
+        purchase_date: new Date().toISOString().split('T')[0],
+        expiry_date: ''
     });
+    const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [message, setMessage] = useState('');
 
     useEffect(() => {
         fetchProducts();
     }, []);
+
+    useEffect(() => {
+        // Auto-calculate expiry date if product has expiry tracking
+        if (selectedProduct?.track_expiry && selectedProduct?.expiry_days && formData.purchase_date) {
+            const purchaseDate = new Date(formData.purchase_date);
+            const expiryDate = new Date(purchaseDate);
+            expiryDate.setDate(expiryDate.getDate() + parseInt(selectedProduct.expiry_days));
+            setFormData(prev => ({
+                ...prev,
+                expiry_date: expiryDate.toISOString().split('T')[0]
+            }));
+        } else if (!selectedProduct?.track_expiry) {
+            setFormData(prev => ({ ...prev, expiry_date: '' }));
+        }
+    }, [selectedProduct, formData.purchase_date]);
 
     const fetchProducts = async () => {
         try {
@@ -25,6 +42,12 @@ export default function PurchasesPage() {
         } catch (error) {
             console.error('Error fetching products:', error);
         }
+    };
+
+    const handleProductChange = (productId: string) => {
+        const product = products.find(p => p.id === parseInt(productId));
+        setSelectedProduct(product);
+        setFormData({ ...formData, product_id: productId });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -36,8 +59,10 @@ export default function PurchasesPage() {
                 product_id: '',
                 quantity: '',
                 price: '',
-                purchase_date: new Date().toISOString().split('T')[0]
+                purchase_date: new Date().toISOString().split('T')[0],
+                expiry_date: ''
             });
+            setSelectedProduct(null);
             setTimeout(() => setMessage(''), 3000);
         } catch (error) {
             console.error('Error recording purchase:', error);
@@ -60,17 +85,22 @@ export default function PurchasesPage() {
                         <label className="block text-sm font-medium text-gray-700">Product</label>
                         <select
                             value={formData.product_id}
-                            onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
+                            onChange={(e) => handleProductChange(e.target.value)}
                             className="w-full mt-1 border p-2 rounded"
                             required
                         >
                             <option value="">Select Product</option>
                             {products.map((p) => (
                                 <option key={p.id} value={p.id}>
-                                    {p.name} ({p.unit})
+                                    {p.name} ({p.unit}) {p.track_expiry ? '🕐' : ''}
                                 </option>
                             ))}
                         </select>
+                        {selectedProduct?.track_expiry && (
+                            <p className="text-xs text-blue-600 mt-1">
+                                ℹ️ This product has expiry tracking enabled ({selectedProduct.expiry_days} days shelf life)
+                            </p>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -99,7 +129,7 @@ export default function PurchasesPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Date</label>
+                        <label className="block text-sm font-medium text-gray-700">Purchase Date</label>
                         <input
                             type="date"
                             value={formData.purchase_date}
@@ -108,6 +138,34 @@ export default function PurchasesPage() {
                             required
                         />
                     </div>
+
+                    {selectedProduct?.track_expiry && (
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                <Calendar className="w-4 h-4 mr-2 text-blue-600" />
+                                Expiry Date
+                            </label>
+                            <input
+                                type="date"
+                                value={formData.expiry_date}
+                                onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+                                className="w-full border p-2 rounded"
+                                min={formData.purchase_date}
+                            />
+                            <p className="text-xs text-gray-600 mt-2">
+                                Auto-calculated based on {selectedProduct.expiry_days} days shelf life. You can adjust if needed.
+                            </p>
+                        </div>
+                    )}
+
+                    {formData.quantity && formData.price && (
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-600">Total Amount</p>
+                            <p className="text-2xl font-bold text-gray-900">
+                                ₹{(parseFloat(formData.quantity) * parseFloat(formData.price)).toFixed(2)}
+                            </p>
+                        </div>
+                    )}
 
                     <button
                         type="submit"

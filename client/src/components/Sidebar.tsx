@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, ShoppingCart, TrendingUp, DollarSign, FileBarChart, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, TrendingUp, DollarSign, FileBarChart, LogOut, X, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { clsx } from 'clsx';
 
@@ -21,6 +21,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         { href: '/purchases', label: 'Purchases', icon: ShoppingCart },
         { href: '/sales', label: 'Sales', icon: TrendingUp },
         { href: '/expenses', label: 'Expenses', icon: DollarSign },
+        { href: '/waste', label: 'Waste', icon: Trash2 },
         { href: '/reports/daily', label: 'Daily Report', icon: FileBarChart },
         { href: '/reports/monthly', label: 'Monthly Report', icon: FileBarChart },
     ];

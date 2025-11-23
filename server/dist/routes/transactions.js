@@ -14,10 +14,10 @@ const supabase_1 = require("../supabase");
 const router = (0, express_1.Router)();
 // Purchases
 router.post('/purchases', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { product_id, quantity, price, purchase_date } = req.body;
+    const { product_id, quantity, price, purchase_date, expiry_date } = req.body;
     const { data, error } = yield supabase_1.supabase
         .from('purchases')
-        .insert([{ product_id, quantity, price, purchase_date }])
+        .insert([{ product_id, quantity, price, purchase_date, expiry_date }])
         .select();
     if (error)
         return res.status(400).json({ error: error.message });

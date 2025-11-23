@@ -5,6 +5,7 @@ import authRoutes from './routes/auth';
 import productRoutes from './routes/products';
 import transactionRoutes from './routes/transactions';
 import reportRoutes from './routes/reports';
+import wasteRoutes from './routes/waste';
 import { supabase } from './supabase';
 
 dotenv.config();
@@ -63,6 +64,7 @@ app.use('/auth', authRoutes);
 app.use('/products', productRoutes);
 app.use('/', transactionRoutes); // /purchases, /sales, /expenses
 app.use('/reports', reportRoutes);
+app.use('/waste', wasteRoutes);
 
 app.get('/supabase-test', async (req, res) => {
     const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Plus, Trash2, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, AlertTriangle } from 'lucide-react';
 
 export default function ProductsPage() {
     const [products, setProducts] = useState<any[]>([]);
@@ -12,7 +12,9 @@ export default function ProductsPage() {
         unit: 'litre',
         selling_price: '',
         cost_price: '',
-        min_stock: ''
+        min_stock: '',
+        track_expiry: false,
+        expiry_days: ''
     });
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
@@ -44,7 +46,9 @@ export default function ProductsPage() {
                 unit: 'litre',
                 selling_price: '',
                 cost_price: '',
-                min_stock: ''
+                min_stock: '',
+                track_expiry: false,
+                expiry_days: ''
             });
             setIsEditing(false);
             setEditId(null);
@@ -72,7 +76,9 @@ export default function ProductsPage() {
             unit: product.unit,
             selling_price: product.selling_price,
             cost_price: product.cost_price,
-            min_stock: product.min_stock
+            min_stock: product.min_stock,
+            track_expiry: product.track_expiry || false,
+            expiry_days: product.expiry_days || ''
         });
         setIsEditing(true);
         setEditId(product.id);
@@ -95,7 +101,7 @@ export default function ProductsPage() {
                     />
                     <input
                         type="text"
-                        placeholder="Category"
+                        placeholder="Category (e.g., Milk, Curd, Paneer)"
                         value={formData.category}
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                         className="border p-2 rounded"
@@ -107,10 +113,13 @@ export default function ProductsPage() {
                     >
                         <option value="litre">Litre</option>
                         <option value="kg">Kg</option>
+                        <option value="packet">Packet</option>
+                        <option value="piece">Piece</option>
                         <option value="unit">Unit</option>
                     </select>
                     <input
                         type="number"
+                        step="0.01"
                         placeholder="Selling Price"
                         value={formData.selling_price}
                         onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
@@ -119,6 +128,7 @@ export default function ProductsPage() {
                     />
                     <input
                         type="number"
+                        step="0.01"
                         placeholder="Cost Price"
                         value={formData.cost_price}
                         onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
@@ -126,11 +136,46 @@ export default function ProductsPage() {
                     />
                     <input
                         type="number"
-                        placeholder="Min Stock"
+                        placeholder="Minimum Stock Level"
                         value={formData.min_stock}
                         onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
                         className="border p-2 rounded"
                     />
+
+                    {/* Expiry Tracking Section */}
+                    <div className="md:col-span-3 border-t pt-4 mt-2">
+                        <div className="flex items-center mb-3">
+                            <input
+                                type="checkbox"
+                                id="track_expiry"
+                                checked={formData.track_expiry}
+                                onChange={(e) => setFormData({ ...formData, track_expiry: e.target.checked, expiry_days: e.target.checked ? formData.expiry_days : '' })}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                            <label htmlFor="track_expiry" className="ml-2 text-sm font-medium text-gray-700">
+                                Track Expiry for this product
+                            </label>
+                        </div>
+
+                        {formData.track_expiry && (
+                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Shelf Life (days)
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="e.g., 7 for milk, 30 for paneer"
+                                    value={formData.expiry_days}
+                                    onChange={(e) => setFormData({ ...formData, expiry_days: e.target.value })}
+                                    className="border p-2 rounded w-full md:w-1/3"
+                                />
+                                <p className="text-xs text-gray-600 mt-2">
+                                    This will help calculate expiry dates when recording purchases
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="md:col-span-3">
                         <button
                             type="submit"
@@ -151,7 +196,9 @@ export default function ProductsPage() {
                                         unit: 'litre',
                                         selling_price: '',
                                         cost_price: '',
-                                        min_stock: ''
+                                        min_stock: '',
+                                        track_expiry: false,
+                                        expiry_days: ''
                                     });
                                 }}
                                 className="ml-2 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
@@ -170,7 +217,9 @@ export default function ProductsPage() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Selling Price</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Min Stock</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expiry</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -178,9 +227,26 @@ export default function ProductsPage() {
                         {products.map((product) => (
                             <tr key={product.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{product.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.category}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span className="px-2 py-1 rounded-full bg-gray-100 text-xs">{product.category || 'N/A'}</span>
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.unit}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{product.selling_price}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span className="flex items-center">
+                                        {product.min_stock > 0 && <AlertTriangle className="w-3 h-3 text-amber-500 mr-1" />}
+                                        {product.min_stock}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {product.track_expiry ? (
+                                        <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+                                            {product.expiry_days} days
+                                        </span>
+                                    ) : (
+                                        <span className="text-gray-400 text-xs">Not tracked</span>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <button
                                         onClick={() => handleEdit(product)}

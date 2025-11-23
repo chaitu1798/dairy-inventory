@@ -12,7 +12,27 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3001;
 
-app.use(cors());
+// Configure CORS to allow frontend domains
+const allowedOrigins = [
+    'http://localhost:3000',
+    'https://dairy-inventory-vercel.vercel.app', // Replace with your actual Vercel domain
+    process.env.FRONTEND_URL // Optional: set this in your backend environment variables
+].filter(Boolean);
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.some(allowed => origin.startsWith(allowed.replace('*', '')))) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
+
 app.use(express.json());
 
 // Root route for health check

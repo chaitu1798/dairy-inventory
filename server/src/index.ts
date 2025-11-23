@@ -20,16 +20,15 @@ const allowedOrigins = [
 ].filter((origin): origin is string => Boolean(origin));
 
 app.use(cors({
-    origin: (req, callback) => {
-        // For CORS v2, req is a CorsRequest (Express-like request)
-        // TypeScript types may vary; handle both string and array cases
-        const origin = (typeof req.header === 'function')
-            ? req.header('origin')
-            : (req.headers ? req.headers.origin : undefined);
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, Postman, etc.)
+        if (!origin) return callback(null, true);
 
-        if (!origin) return callback(null, true); // Allow requests without origin
-
-        if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+        if (
+            allowedOrigins.some(
+                allowed => origin === allowed || origin.startsWith(allowed)
+            )
+        ) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));

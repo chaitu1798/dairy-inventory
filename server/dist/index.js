@@ -23,6 +23,7 @@ const supabase_1 = require("./supabase");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3001;
+app.use(express_1.default.json());
 // Configure CORS to allow frontend domains
 const allowedOrigins = [
     "http://localhost:3000",
@@ -44,7 +45,6 @@ app.use((0, cors_1.default)({
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
 }));
-app.use(express_1.default.json());
 // Root route for health check
 app.get('/', (req, res) => {
     res.json({ message: 'Dairy Inventory API is running 🚀' });

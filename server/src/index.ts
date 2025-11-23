@@ -12,6 +12,8 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3001;
 
+app.use(express.json());
+
 // Configure CORS to allow frontend domains
 const allowedOrigins = [
     "http://localhost:3000",
@@ -35,8 +37,6 @@ app.use(
         allowedHeaders: ["Content-Type", "Authorization"],
     })
 );
-
-app.use(express.json());
 
 // Root route for health check
 app.get('/', (req, res) => {

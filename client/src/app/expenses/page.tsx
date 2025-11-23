@@ -42,49 +42,51 @@ export default function ExpensesPage() {
                     </div>
                 )}
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Category</label>
-                        <input
-                            type="text"
-                            placeholder="e.g., Transport, Packaging, Salary"
-                            value={formData.category}
-                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                            className="w-full mt-1 border p-2 rounded"
-                            required
-                        />
-                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700">Category</label>
+                            <input
+                                type="text"
+                                placeholder="e.g., Transport, Packaging, Salary"
+                                value={formData.category}
+                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                className="w-full mt-1 border p-2 rounded"
+                                required
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Amount</label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            value={formData.amount}
-                            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                            className="w-full mt-1 border p-2 rounded"
-                            required
-                        />
-                    </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Amount</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                value={formData.amount}
+                                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                className="w-full mt-1 border p-2 rounded"
+                                required
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Notes</label>
-                        <textarea
-                            value={formData.notes}
-                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            className="w-full mt-1 border p-2 rounded"
-                            rows={3}
-                        />
-                    </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Date</label>
+                            <input
+                                type="date"
+                                value={formData.expense_date}
+                                onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
+                                className="w-full mt-1 border p-2 rounded"
+                                required
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Date</label>
-                        <input
-                            type="date"
-                            value={formData.expense_date}
-                            onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
-                            className="w-full mt-1 border p-2 rounded"
-                            required
-                        />
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700">Notes</label>
+                            <textarea
+                                value={formData.notes}
+                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                className="w-full mt-1 border p-2 rounded"
+                                rows={3}
+                            />
+                        </div>
                     </div>
 
                     <button

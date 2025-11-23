@@ -168,7 +168,7 @@ export default function WastePage() {
                         </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Quantity</label>
                             <input
@@ -195,7 +195,7 @@ export default function WastePage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Cost Value</label>
                             <input
@@ -253,10 +253,10 @@ export default function WastePage() {
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Quantity</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Reason</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost Value</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Notes</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -267,11 +267,12 @@ export default function WastePage() {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                         {record.products?.name}
+                                        <div className="sm:hidden text-xs text-gray-500 mt-1">{record.quantity} {record.products?.unit}</div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">
                                         {record.quantity} {record.products?.unit}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm hidden md:table-cell">
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getReasonBadge(record.reason)}`}>
                                             {record.reason.charAt(0).toUpperCase() + record.reason.slice(1)}
                                         </span>
@@ -279,7 +280,7 @@ export default function WastePage() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">
                                         ₹{record.cost_value?.toFixed(2)}
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                    <td className="px-6 py-4 text-sm text-gray-500 hidden lg:table-cell">
                                         {record.notes || '-'}
                                     </td>
                                 </tr>

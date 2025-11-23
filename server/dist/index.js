@@ -25,23 +25,24 @@ const app = (0, express_1.default)();
 const port = process.env.PORT || 3001;
 // Configure CORS to allow frontend domains
 const allowedOrigins = [
-    'http://localhost:3000',
-    'https://dairy-inventory-vercel.vercel.app', // Replace with your actual Vercel domain
-    process.env.FRONTEND_URL // Optional: set this in your backend environment variables
-].filter((origin) => Boolean(origin));
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://dairy-inventory.vercel.app",
+    "https://dairy-inventory-production.up.railway.app"
+];
 app.use((0, cors_1.default)({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin)
-            return callback(null, true);
-        if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         }
         else {
-            callback(new Error('Not allowed by CORS'));
+            console.log("Blocked by CORS:", origin);
+            callback(new Error("Not allowed by CORS"));
         }
     },
-    credentials: true
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
 }));
 app.use(express_1.default.json());
 // Root route for health check

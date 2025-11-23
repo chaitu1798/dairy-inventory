@@ -5,7 +5,8 @@ import { Inter } from 'next/font/google';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import { usePathname, useRouter } from 'next/navigation';
-import React from 'react'; // Added React import
+import React from 'react';
+import { Analytics } from '@vercel/analytics/next';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -70,6 +71,7 @@ export default function RootLayout({
         <AuthProvider>
           <AuthenticatedLayout>{children}</AuthenticatedLayout>
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );

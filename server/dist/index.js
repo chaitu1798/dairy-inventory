@@ -38,13 +38,17 @@ app.use((0, cors_1.default)({
         }
         else {
             console.log("Blocked by CORS:", origin);
-            callback(new Error("Not allowed by CORS"));
+            callback(null, false); // DO NOT THROW ERROR
         }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    preflightContinue: false,
+    optionsSuccessStatus: 200, // Important for Safari & Vercel
 }));
+// Important: handle all OPTIONS requests
+app.options("*", (0, cors_1.default)());
 // Root route for health check
 app.get('/', (req, res) => {
     res.json({ message: 'Dairy Inventory API is running 🚀' });

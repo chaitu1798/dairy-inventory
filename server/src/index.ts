@@ -17,14 +17,14 @@ const allowedOrigins = [
     'http://localhost:3000',
     'https://dairy-inventory-vercel.vercel.app', // Replace with your actual Vercel domain
     process.env.FRONTEND_URL // Optional: set this in your backend environment variables
-].filter(Boolean);
+].filter((origin): origin is string => Boolean(origin));
 
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.some(allowed => origin.startsWith(allowed.replace('*', '')))) {
+        if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -32,6 +32,7 @@ app.use(cors({
     },
     credentials: true
 }));
+
 
 app.use(express.json());
 

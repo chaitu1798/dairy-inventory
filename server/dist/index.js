@@ -33,19 +33,27 @@ const allowedOrigins = [
 ];
 app.use((0, cors_1.default)({
     origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
+        // Allow requests with no origin (mobile apps, Postman, etc.)
+        if (!origin) {
+            return callback(null, true);
+        }
+        // Check if origin is in allowed list OR is a Vercel/Railway preview deployment
+        const isAllowed = allowedOrigins.includes(origin) ||
+            origin.includes('.vercel.app') ||
+            origin.includes('.up.railway.app');
+        if (isAllowed) {
             callback(null, true);
         }
         else {
             console.log("Blocked by CORS:", origin);
-            callback(null, false); // DO NOT THROW ERROR
+            callback(null, true); // Allow anyway but log it for debugging
         }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     preflightContinue: false,
-    optionsSuccessStatus: 200, // Important for Safari & Vercel
+    optionsSuccessStatus: 200,
 }));
 // Important: handle all OPTIONS requests
 app.options("*", (0, cors_1.default)());

@@ -1,5 +1,5 @@
 import express from 'express';
-import cors, { CorsOptionsDelegate } from 'cors';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import productRoutes from './routes/products';
@@ -15,23 +15,26 @@ const port = process.env.PORT || 3001;
 // Configure CORS to allow frontend domains
 const allowedOrigins = [
     'http://localhost:3000',
-    'https://dairy-inventory-vercel.vercel.app', // Replace with your actual Vercel domain
-    process.env.FRONTEND_URL // Optional: set this in your backend environment variables
+    'https://dairy-inventory-vercel.vercel.app',
+    process.env.FRONTEND_URL
 ].filter((origin): origin is string => Boolean(origin));
 
-const corsOptionsDelegate: CorsOptionsDelegate = (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
-        callback(null, true);
-    } else {
-        callback(new Error('Not allowed by CORS'));
-    }
-};
-
 app.use(cors({
-    origin: corsOptionsDelegate,
+    origin: (req, callback) => {
+        // For CORS v2, req is a CorsRequest (Express-like request)
+        // TypeScript types may vary; handle both string and array cases
+        const origin = (typeof req.header === 'function')
+            ? req.header('origin')
+            : (req.headers ? req.headers.origin : undefined);
+
+        if (!origin) return callback(null, true); // Allow requests without origin
+
+        if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 

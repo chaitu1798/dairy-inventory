@@ -66,9 +66,9 @@ app.get('/supabase-test', (req, res) => __awaiter(void 0, void 0, void 0, functi
 // Initialize calendar months for reports
 const initCalendar = () => __awaiter(void 0, void 0, void 0, function* () {
     const startDate = new Date();
-    startDate.setFullYear(startDate.getFullYear() - 2); // Start from 2 years ago
+    startDate.setFullYear(startDate.getFullYear() - 2);
     const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1); // Up to next year
+    endDate.setFullYear(endDate.getFullYear() + 1);
     const { error } = yield supabase_1.supabase.rpc('populate_calendar_months', {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString()

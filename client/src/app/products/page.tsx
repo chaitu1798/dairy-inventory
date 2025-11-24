@@ -63,8 +63,13 @@ export default function ProductsPage() {
             try {
                 await api.delete(`/products/${id}`);
                 fetchProducts();
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error deleting product:', error);
+                if (error.response && error.response.status === 400) {
+                    alert('Cannot delete this product because it is associated with existing sales or purchases. Please delete the related records first.');
+                } else {
+                    alert('Failed to delete product. Please try again.');
+                }
             }
         }
     };

@@ -96,5 +96,6 @@ const initCalendar = async () => {
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
+    console.log('Transaction routes loaded');
     initCalendar();
 });

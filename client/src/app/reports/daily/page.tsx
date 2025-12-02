@@ -25,23 +25,61 @@ export default function DailyReportPage() {
         }
     };
 
-    const downloadReport = () => {
-        if (!stats) return;
+    const downloadReport = async () => {
+        try {
+            const res = await api.get(`/reports/daily/details?date=${date}`);
+            const { records, totals } = res.data;
 
-        const csvContent = [
-            ['Date', 'Total Sales', 'Total Purchases', 'Total Expenses', 'Total Waste', 'Profit'],
-            [date, stats.total_sales, stats.total_purchases, stats.total_expenses, stats.total_waste, stats.profit]
-        ].map(e => e.join(",")).join("\n");
+            const header = ['Date', 'Product Name', 'Opening Stock', 'Purchases (Qty)', 'Sales (Qty)', 'Closing Stock', 'Total Purchase Value', 'Total Sales Value', 'Gross Profit', 'Net Profit (after expenses)', 'Notes'];
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `daily_report_${date}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            const rows = records.map((r: any) => [
+                r.date,
+                r.product_name,
+                r.opening_stock,
+                r.purchases_qty,
+                r.sales_qty,
+                r.closing_stock,
+                r.total_purchase_value.toFixed(2),
+                r.total_sales_value.toFixed(2),
+                r.gross_profit.toFixed(2),
+                '', // Net Profit empty for product rows
+                r.notes
+            ]);
+
+            // Total Row
+            const totalRow = [
+                'TOTALS',
+                '',
+                '',
+                '',
+                '',
+                '',
+                totals.total_purchase_value.toFixed(2),
+                totals.total_sales_value.toFixed(2),
+                totals.total_gross_profit.toFixed(2),
+                totals.net_profit.toFixed(2),
+                `Expenses: ${totals.total_expenses.toFixed(2)}`
+            ];
+
+            const csvContent = [
+                header.join(','),
+                ...rows.map((r: any[]) => r.join(',')),
+                totalRow.join(',')
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Daily_Report_${date}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error('Error downloading report:', error);
+            alert('Failed to download report');
+        }
     };
 
     const StatCard = ({ title, value, icon: Icon, gradient, delay }: any) => (

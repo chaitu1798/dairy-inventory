@@ -10,7 +10,6 @@ export default function PurchasesPage() {
     const [formData, setFormData] = useState({
         product_id: '',
         quantity: '',
-        price: '',
         purchase_date: new Date().toISOString().split('T')[0],
         expiry_date: ''
     });
@@ -81,7 +80,6 @@ export default function PurchasesPage() {
             setFormData({
                 product_id: '',
                 quantity: '',
-                price: '',
                 purchase_date: new Date().toISOString().split('T')[0],
                 expiry_date: ''
             });
@@ -102,7 +100,6 @@ export default function PurchasesPage() {
         setFormData({
             product_id: purchase.product_id,
             quantity: purchase.quantity,
-            price: purchase.price,
             purchase_date: purchase.purchase_date,
             expiry_date: purchase.expiry_date || ''
         });
@@ -130,7 +127,6 @@ export default function PurchasesPage() {
         setFormData({
             product_id: '',
             quantity: '',
-            price: '',
             purchase_date: new Date().toISOString().split('T')[0],
             expiry_date: ''
         });
@@ -183,28 +179,18 @@ export default function PurchasesPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Price per Unit</label>
+                            <label className="block text-sm font-medium text-gray-700">Purchase Date</label>
                             <input
-                                type="number"
-                                step="0.01"
-                                value={formData.price}
-                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                type="date"
+                                value={formData.purchase_date}
+                                onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
                                 className="w-full mt-1 border p-2 rounded"
                                 required
                             />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Purchase Date</label>
-                        <input
-                            type="date"
-                            value={formData.purchase_date}
-                            onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
-                            className="w-full mt-1 border p-2 rounded"
-                            required
-                        />
-                    </div>
+
 
                     {selectedProduct?.track_expiry && (
                         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
@@ -225,14 +211,7 @@ export default function PurchasesPage() {
                         </div>
                     )}
 
-                    {formData.quantity && formData.price && (
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                            <p className="text-sm text-gray-600">Total Amount</p>
-                            <p className="text-2xl font-bold text-gray-900">
-                                ₹{(parseFloat(formData.quantity) * parseFloat(formData.price)).toFixed(2)}
-                            </p>
-                        </div>
-                    )}
+
 
                     <div className="flex gap-2">
                         <button

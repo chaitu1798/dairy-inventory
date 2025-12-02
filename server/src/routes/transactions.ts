@@ -27,7 +27,21 @@ router.get('/purchases', async (req, res) => {
 });
 
 router.post('/purchases', async (req, res) => {
-    const { product_id, quantity, price, purchase_date, expiry_date } = req.body;
+    const { product_id, quantity, purchase_date, expiry_date } = req.body;
+
+    // Fetch product cost price
+    const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('cost_price')
+        .eq('id', product_id)
+        .single();
+
+    if (productError || !product) {
+        return res.status(400).json({ error: 'Product not found' });
+    }
+
+    const price = product.cost_price;
+
     const { data, error } = await supabase
         .from('purchases')
         .insert([{ product_id, quantity, price, purchase_date, expiry_date }])
@@ -67,6 +81,9 @@ router.get('/sales', async (req, res) => {
             products (
                 name,
                 unit
+            ),
+            customers (
+                name
             )
         `)
         .order('sale_date', { ascending: false });
@@ -81,10 +98,36 @@ router.get('/sales', async (req, res) => {
 });
 
 router.post('/sales', async (req, res) => {
-    const { product_id, quantity, price, sale_date } = req.body;
+    const { product_id, quantity, sale_date, customer_id, status, due_date } = req.body;
+
+    // Fetch product selling price
+    const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('selling_price')
+        .eq('id', product_id)
+        .single();
+
+    if (productError || !product) {
+        return res.status(400).json({ error: 'Product not found' });
+    }
+
+    const price = product.selling_price;
+
+    // Generate Invoice Number (Simple timestamp based for now, or random)
+    const invoice_number = `INV-${Date.now()}`;
+
     const { data, error } = await supabase
         .from('sales')
-        .insert([{ product_id, quantity, price, sale_date }])
+        .insert([{
+            product_id,
+            quantity,
+            price,
+            sale_date,
+            customer_id: customer_id || null,
+            status: status || 'paid',
+            due_date: due_date || null,
+            invoice_number
+        }])
         .select();
 
     if (error) return res.status(400).json({ error: error.message });
@@ -106,6 +149,11 @@ router.put('/sales/:id', async (req, res) => {
 
 router.delete('/sales/:id', async (req, res) => {
     const { id } = req.params;
+
+    // Delete related payments first (manual cascade)
+    const { error: paymentError } = await supabase.from('payments').delete().eq('sale_id', id);
+    if (paymentError) console.error('Error deleting payments:', paymentError); // Log but continue
+
     const { error } = await supabase.from('sales').delete().eq('id', id);
     if (error) return res.status(400).json({ error: error.message });
     res.json({ message: 'Sale deleted' });

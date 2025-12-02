@@ -128,6 +128,119 @@ router.get('/daily', async (req, res) => {
     });
 });
 
+// Detailed Daily Report for CSV
+router.get('/daily/details', async (req, res) => {
+    const { date } = req.query;
+    const targetDate = date ? (date as string) : new Date().toISOString().split('T')[0];
+
+    try {
+        // 1. Fetch all products
+        const { data: products, error: prodError } = await supabase
+            .from('products')
+            .select('id, name, cost_price, selling_price');
+
+        if (prodError) throw prodError;
+
+        // 2. Fetch past transactions (before targetDate) for Opening Stock
+        // We need to sum quantities by product_id
+        const { data: pastPurchases } = await supabase
+            .from('purchases')
+            .select('product_id, quantity')
+            .lt('purchase_date', targetDate);
+
+        const { data: pastSales } = await supabase
+            .from('sales')
+            .select('product_id, quantity')
+            .lt('sale_date', targetDate);
+
+        const { data: pastWaste } = await supabase
+            .from('waste')
+            .select('product_id, quantity')
+            .lt('waste_date', targetDate);
+
+        // 3. Fetch today's transactions (on targetDate)
+        const { data: todayPurchases } = await supabase
+            .from('purchases')
+            .select('product_id, quantity, total')
+            .eq('purchase_date', targetDate);
+
+        const { data: todaySales } = await supabase
+            .from('sales')
+            .select('product_id, quantity, total')
+            .eq('sale_date', targetDate);
+
+        const { data: todayWaste } = await supabase
+            .from('waste')
+            .select('product_id, quantity')
+            .eq('waste_date', targetDate);
+
+        // 4. Fetch today's expenses (global)
+        const { data: expenses } = await supabase
+            .from('expenses')
+            .select('amount')
+            .eq('expense_date', targetDate);
+
+        const totalExpenses = expenses?.reduce((sum, exp) => sum + exp.amount, 0) || 0;
+
+        // Helper to sum by product
+        const sumByProduct = (items: any[], prodId: number, field: string = 'quantity') =>
+            items?.filter(i => i.product_id === prodId).reduce((acc, curr) => acc + (curr[field] || 0), 0) || 0;
+
+        // 5. Build Report Data
+        const reportData = products?.map(product => {
+            // Opening Stock Calculation
+            const pastPurchasedQty = sumByProduct(pastPurchases || [], product.id);
+            const pastSoldQty = sumByProduct(pastSales || [], product.id);
+            const pastWastedQty = sumByProduct(pastWaste || [], product.id);
+            const openingStock = pastPurchasedQty - pastSoldQty - pastWastedQty;
+
+            // Today's Activity
+            const purchasedQty = sumByProduct(todayPurchases || [], product.id);
+            const soldQty = sumByProduct(todaySales || [], product.id);
+            const wastedQty = sumByProduct(todayWaste || [], product.id); // Needed for closing stock
+
+            // Closing Stock
+            const closingStock = openingStock + purchasedQty - soldQty - wastedQty;
+
+            // Values
+            const purchaseValue = sumByProduct(todayPurchases || [], product.id, 'total');
+            const salesValue = sumByProduct(todaySales || [], product.id, 'total');
+
+            // Gross Profit: Sales Value - (Sold Qty * Cost Price)
+            // Note: Using current cost price. Ideally should use FIFO/LIFO but that's complex.
+            const costOfGoodsSold = soldQty * product.cost_price;
+            const grossProfit = salesValue - costOfGoodsSold;
+
+            return {
+                date: targetDate,
+                product_name: product.name,
+                opening_stock: openingStock,
+                purchases_qty: purchasedQty,
+                sales_qty: soldQty,
+                closing_stock: closingStock,
+                total_purchase_value: purchaseValue,
+                total_sales_value: salesValue,
+                gross_profit: grossProfit,
+                notes: ''
+            };
+        });
+
+        res.json({
+            records: reportData,
+            totals: {
+                total_purchase_value: reportData?.reduce((sum, r) => sum + r.total_purchase_value, 0) || 0,
+                total_sales_value: reportData?.reduce((sum, r) => sum + r.total_sales_value, 0) || 0,
+                total_gross_profit: reportData?.reduce((sum, r) => sum + r.gross_profit, 0) || 0,
+                total_expenses: totalExpenses,
+                net_profit: (reportData?.reduce((sum, r) => sum + r.gross_profit, 0) || 0) - totalExpenses
+            }
+        });
+
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Monthly report
 router.get('/monthly', async (req, res) => {
     const { month, year } = req.query;

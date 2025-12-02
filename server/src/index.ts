@@ -6,6 +6,9 @@ import productRoutes from './routes/products';
 import transactionRoutes from './routes/transactions';
 import reportRoutes from './routes/reports';
 import wasteRoutes from './routes/waste';
+import customersRoutes from './routes/customers';
+import paymentsRoutes from './routes/payments';
+import arRoutes from './routes/accounts_receivable';
 import { supabase } from './supabase';
 
 dotenv.config();
@@ -65,6 +68,9 @@ app.use('/products', productRoutes);
 app.use('/', transactionRoutes); // /purchases, /sales, /expenses
 app.use('/reports', reportRoutes);
 app.use('/waste', wasteRoutes);
+app.use('/customers', customersRoutes);
+app.use('/payments', paymentsRoutes);
+app.use('/ar', arRoutes);
 
 app.get('/supabase-test', async (req, res) => {
     const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });

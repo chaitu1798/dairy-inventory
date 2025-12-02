@@ -6,12 +6,15 @@ import { Plus, Trash2, Edit2 } from 'lucide-react';
 
 export default function SalesPage() {
     const [products, setProducts] = useState<any[]>([]);
+    const [customers, setCustomers] = useState<any[]>([]);
     const [sales, setSales] = useState<any[]>([]);
     const [formData, setFormData] = useState({
         product_id: '',
+        customer_id: '',
         quantity: '',
-        price: '',
-        sale_date: new Date().toISOString().split('T')[0]
+        sale_date: new Date().toISOString().split('T')[0],
+        status: 'paid',
+        due_date: ''
     });
     const [message, setMessage] = useState('');
     const [isEditing, setIsEditing] = useState(false);
@@ -23,6 +26,7 @@ export default function SalesPage() {
 
     useEffect(() => {
         fetchProducts();
+        fetchCustomers();
         fetchSales();
     }, [dateRange]);
 
@@ -32,6 +36,15 @@ export default function SalesPage() {
             setProducts(res.data);
         } catch (error) {
             console.error('Error fetching products:', error);
+        }
+    };
+
+    const fetchCustomers = async () => {
+        try {
+            const res = await api.get('/customers');
+            setCustomers(res.data);
+        } catch (error) {
+            console.error('Error fetching customers:', error);
         }
     };
 
@@ -45,30 +58,36 @@ export default function SalesPage() {
     };
 
     const handleProductChange = (productId: string) => {
-        const product = products.find(p => p.id.toString() === productId);
         setFormData({
             ...formData,
-            product_id: productId,
-            price: product ? product.selling_price : ''
+            product_id: productId
         });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            const payload = {
+                ...formData,
+                customer_id: formData.customer_id || null,
+                due_date: formData.status === 'pending' ? formData.due_date : null
+            };
+
             if (isEditing && editId) {
-                await api.put(`/sales/${editId}`, formData);
+                await api.put(`/sales/${editId}`, payload);
                 setMessage('Sale updated successfully!');
             } else {
-                await api.post('/sales', formData);
+                await api.post('/sales', payload);
                 setMessage('Sale recorded successfully!');
             }
 
             setFormData({
                 product_id: '',
+                customer_id: '',
                 quantity: '',
-                price: '',
-                sale_date: new Date().toISOString().split('T')[0]
+                sale_date: new Date().toISOString().split('T')[0],
+                status: 'paid',
+                due_date: ''
             });
             setIsEditing(false);
             setEditId(null);
@@ -83,9 +102,11 @@ export default function SalesPage() {
     const handleEdit = (sale: any) => {
         setFormData({
             product_id: sale.product_id,
+            customer_id: sale.customer_id || '',
             quantity: sale.quantity,
-            price: sale.price,
-            sale_date: sale.sale_date
+            sale_date: sale.sale_date,
+            status: sale.status || 'paid',
+            due_date: sale.due_date || ''
         });
         setIsEditing(true);
         setEditId(sale.id);
@@ -109,9 +130,11 @@ export default function SalesPage() {
         setEditId(null);
         setFormData({
             product_id: '',
+            customer_id: '',
             quantity: '',
-            price: '',
-            sale_date: new Date().toISOString().split('T')[0]
+            sale_date: new Date().toISOString().split('T')[0],
+            status: 'paid',
+            due_date: ''
         });
     };
 
@@ -127,21 +150,38 @@ export default function SalesPage() {
                     </div>
                 )}
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Product</label>
-                        <select
-                            value={formData.product_id}
-                            onChange={(e) => handleProductChange(e.target.value)}
-                            className="w-full mt-1 border p-2 rounded"
-                            required
-                        >
-                            <option value="">Select Product</option>
-                            {products.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                    {p.name} ({p.unit})
-                                </option>
-                            ))}
-                        </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Product</label>
+                            <select
+                                value={formData.product_id}
+                                onChange={(e) => handleProductChange(e.target.value)}
+                                className="w-full mt-1 border p-2 rounded"
+                                required
+                            >
+                                <option value="">Select Product</option>
+                                {products.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name} ({p.unit})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Customer (Optional)</label>
+                            <select
+                                value={formData.customer_id}
+                                onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
+                                className="w-full mt-1 border p-2 rounded"
+                            >
+                                <option value="">Walk-in Customer</option>
+                                {customers.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -157,27 +197,41 @@ export default function SalesPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Selling Price</label>
+                            <label className="block text-sm font-medium text-gray-700">Date</label>
                             <input
-                                type="number"
-                                step="0.01"
-                                value={formData.price}
-                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                type="date"
+                                value={formData.sale_date}
+                                onChange={(e) => setFormData({ ...formData, sale_date: e.target.value })}
                                 className="w-full mt-1 border p-2 rounded"
                                 required
                             />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Date</label>
-                        <input
-                            type="date"
-                            value={formData.sale_date}
-                            onChange={(e) => setFormData({ ...formData, sale_date: e.target.value })}
-                            className="w-full mt-1 border p-2 rounded"
-                            required
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Payment Status</label>
+                            <select
+                                value={formData.status}
+                                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                className="w-full mt-1 border p-2 rounded"
+                            >
+                                <option value="paid">Paid (Cash/UPI)</option>
+                                <option value="pending">Pending (Credit)</option>
+                            </select>
+                        </div>
+                        {formData.status === 'pending' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Due Date</label>
+                                <input
+                                    type="date"
+                                    value={formData.due_date}
+                                    onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                                    className="w-full mt-1 border p-2 rounded"
+                                    required
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex gap-2">
@@ -225,10 +279,11 @@ export default function SalesPage() {
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -238,17 +293,25 @@ export default function SalesPage() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {new Date(sale.sale_date).toLocaleDateString()}
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {sale.customers?.name || 'Walk-in'}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                         {sale.products?.name}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {sale.quantity} {sale.products?.unit}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        ₹{sale.price}
-                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">
                                         ₹{(sale.quantity * sale.price).toFixed(2)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                            ${sale.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                                sale.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                                                    'bg-yellow-100 text-yellow-800'}`}>
+                                            {sale.status ? sale.status.toUpperCase() : 'PAID'}
+                                        </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <button
@@ -268,7 +331,7 @@ export default function SalesPage() {
                             ))}
                             {sales.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                                         No sales recorded yet
                                     </td>
                                 </tr>

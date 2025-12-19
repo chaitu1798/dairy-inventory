@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import productRoutes from './routes/products';
 import transactionRoutes from './routes/transactions';
@@ -9,7 +8,10 @@ import wasteRoutes from './routes/waste';
 import customersRoutes from './routes/customers';
 import paymentsRoutes from './routes/payments';
 import arRoutes from './routes/accounts_receivable';
+import stockRoutes from './routes/stock';
 import { supabase } from './supabase';
+
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -71,6 +73,7 @@ app.use('/waste', wasteRoutes);
 app.use('/customers', customersRoutes);
 app.use('/payments', paymentsRoutes);
 app.use('/ar', arRoutes);
+app.use('/stock', stockRoutes);
 
 app.get('/supabase-test', async (req, res) => {
     const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });

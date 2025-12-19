@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api';
-import { Plus, Calendar, Trash2, Edit2 } from 'lucide-react';
+import { Plus, Calendar, Trash2, Edit2, Camera, X } from 'lucide-react';
 
 export default function PurchasesPage() {
     const [products, setProducts] = useState<any[]>([]);
@@ -21,6 +21,14 @@ export default function PurchasesPage() {
         startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0]
     });
+
+    // Stock Update State
+    const [showStockModal, setShowStockModal] = useState(false);
+    const [stockImage, setStockImage] = useState('');
+    const [stockAction, setStockAction] = useState<'IN' | 'OUT'>('IN');
+    const [stockQuantity, setStockQuantity] = useState('');
+    const [selectedProductId, setSelectedProductId] = useState('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         fetchProducts();
@@ -132,9 +140,109 @@ export default function PurchasesPage() {
         });
     };
 
+    const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            uploadImage(file);
+        }
+    };
+
+    const uploadImage = async (file: File) => {
+        const formData = new FormData();
+        formData.append('image', file);
+        try {
+            // 1. Upload Image
+            const res = await api.post('/stock/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            const imageUrl = res.data.url;
+
+            // 2. Analyze Image with Gemini
+            setMessage('Analyzing image...');
+            const analyzeRes = await api.post('/stock/analyze', { imageUrl });
+            const { productName, quantity, date } = analyzeRes.data;
+
+            // 3. Pre-fill Form
+            setFormData(prev => ({
+                ...prev,
+                quantity: quantity || prev.quantity,
+                purchase_date: date || prev.purchase_date
+            }));
+
+            // Try to match product name
+            if (productName) {
+                const matchedProduct = products.find(p =>
+                    p.name.toLowerCase().includes(productName.toLowerCase()) ||
+                    productName.toLowerCase().includes(p.name.toLowerCase())
+                );
+                if (matchedProduct) {
+                    setSelectedProduct(matchedProduct);
+                    setFormData(prev => ({ ...prev, product_id: matchedProduct.id.toString() }));
+                    setMessage(`Matched product: ${matchedProduct.name}`);
+                } else {
+                    setMessage(`Could not auto-match product: ${productName}`);
+                }
+            } else {
+                setMessage('Analysis complete. Please verify details.');
+            }
+
+            // Clear message after delay
+            setTimeout(() => setMessage(''), 5000);
+
+        } catch (error) {
+            console.error('Upload/Analysis failed', error);
+            setMessage('Failed to analyze image');
+            setTimeout(() => setMessage(''), 3000);
+        }
+    };
+
+    const handleStockUpdate = async () => {
+        if (!selectedProductId || !stockQuantity) {
+            alert('Please select a product and enter quantity');
+            return;
+        }
+        try {
+            await api.post('/stock/update', {
+                productId: selectedProductId,
+                quantity: stockQuantity,
+                actionType: stockAction,
+                imageUrl: stockImage
+            });
+            setShowStockModal(false);
+            setStockImage('');
+            setStockQuantity('');
+            setSelectedProductId('');
+            setStockAction('IN');
+            fetchPurchases(); // Refresh purchases list
+            alert('Stock updated successfully!');
+        } catch (error) {
+            console.error('Stock update failed', error);
+            alert('Failed to update stock');
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fade-in">
-            <h1 className="text-3xl font-bold text-gray-900">Purchases</h1>
+            <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-bold text-gray-900">Purchases</h1>
+                <div>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        ref={fileInputRef}
+                        onChange={handleImageCapture}
+                    />
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center transition-all shadow-md"
+                    >
+                        <Camera className="w-5 h-5 mr-2" />
+                        Capture / Upload
+                    </button>
+                </div>
+            </div>
 
             <div className="bg-white p-6 rounded-lg shadow-md max-w-2xl transform transition-all duration-300 hover:shadow-lg">
                 <h2 className="text-xl font-bold mb-4">{isEditing ? 'Edit Purchase' : 'Record New Purchase'}</h2>
@@ -314,6 +422,78 @@ export default function PurchasesPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Stock Update Modal */}
+            {showStockModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden animate-fade-in">
+                        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                            <h3 className="text-lg font-bold">Update Stock from Image</h3>
+                            <button onClick={() => setShowStockModal(false)} className="text-gray-500 hover:text-gray-700">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {stockImage && (
+                                <div className="w-full h-48 bg-gray-100 rounded-lg overflow-hidden mb-4">
+                                    <img src={stockImage} alt="Captured Stock" className="w-full h-full object-contain" />
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Select Product</label>
+                                <select
+                                    value={selectedProductId}
+                                    onChange={(e) => setSelectedProductId(e.target.value)}
+                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500"
+                                >
+                                    <option value="">-- Choose Product --</option>
+                                    {products.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name} ({p.category})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Action</label>
+                                <div className="flex space-x-4">
+                                    <button
+                                        onClick={() => setStockAction('IN')}
+                                        className={`flex-1 py-2 rounded font-medium ${stockAction === 'IN' ? 'bg-green-100 text-green-800 border-green-300 border' : 'bg-gray-100 text-gray-600'}`}
+                                    >
+                                        Stock IN (Purchase)
+                                    </button>
+                                    <button
+                                        onClick={() => setStockAction('OUT')}
+                                        className={`flex-1 py-2 rounded font-medium ${stockAction === 'OUT' ? 'bg-red-100 text-red-800 border-red-300 border' : 'bg-gray-100 text-gray-600'}`}
+                                    >
+                                        Stock OUT (Waste/Use)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={stockQuantity}
+                                    onChange={(e) => setStockQuantity(e.target.value)}
+                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-purple-500"
+                                    placeholder="Enter quantity"
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleStockUpdate}
+                                className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition-colors mt-4"
+                            >
+                                Confirm Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

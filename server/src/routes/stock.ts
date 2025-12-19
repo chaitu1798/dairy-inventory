@@ -53,7 +53,7 @@ router.post('/analyze', async (req, res) => {
 
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         // Fetch image data
         console.log('Fetching image from URL:', imageUrl);
@@ -89,12 +89,19 @@ router.post('/analyze', async (req, res) => {
 
         // Clean up markdown code blocks if present
         const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const data = JSON.parse(jsonStr);
 
-        res.json(data);
+        try {
+            const data = JSON.parse(jsonStr);
+            res.json(data);
+        } catch (parseError) {
+            console.error('JSON Parse Error:', parseError);
+            console.error('Raw Gemini Text:', text);
+            throw new Error('Failed to parse Gemini response as JSON');
+        }
+
     } catch (error: any) {
-        console.error('Gemini analysis error:', error);
-        res.status(500).json({ error: 'Failed to analyze image', details: error.message });
+        console.error('Gemini analysis error details:', JSON.stringify(error, null, 2));
+        res.status(500).json({ error: 'Failed to analyze image', details: error.message, fullError: error });
     }
 });
 

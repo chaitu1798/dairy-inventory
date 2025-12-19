@@ -156,10 +156,11 @@ export default function PurchasesPage() {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             const imageUrl = res.data.url;
+            const filePath = res.data.filePath;
 
             // 2. Analyze Image with Gemini
             setMessage('Analyzing image...');
-            const analyzeRes = await api.post('/stock/analyze', { imageUrl });
+            const analyzeRes = await api.post('/stock/analyze', { imageUrl, filePath });
             const { productName, quantity, date } = analyzeRes.data;
 
             // 3. Pre-fill Form

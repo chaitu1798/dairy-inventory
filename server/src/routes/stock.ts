@@ -34,7 +34,8 @@ router.post('/upload', upload.single('image'), async (req, res) => {
             .from('stock-images')
             .getPublicUrl(filePath);
 
-        res.json({ url: publicUrl });
+        // Return both URL and filePath
+        res.json({ url: publicUrl, filePath });
     } catch (error) {
         console.error('Upload error:', error);
         res.status(500).json({ error: 'Internal server error during upload' });
@@ -45,24 +46,41 @@ router.post('/upload', upload.single('image'), async (req, res) => {
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 router.post('/analyze', async (req, res) => {
-    const { imageUrl } = req.body;
+    const { imageUrl, filePath } = req.body;
 
-    if (!imageUrl) {
-        return res.status(400).json({ error: 'Image URL is required' });
+    if (!imageUrl && !filePath) {
+        return res.status(400).json({ error: 'Image URL or File Path is required' });
     }
 
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        // Fetch image data
-        console.log('Fetching image from URL:', imageUrl);
-        const imageResp = await fetch(imageUrl);
-        if (!imageResp.ok) {
-            throw new Error(`Failed to fetch image: ${imageResp.statusText}`);
+        let imageBuffer: ArrayBuffer;
+        let mimeType = 'image/jpeg'; // Default, ideally fetch from metadata if possible or guess
+
+        // Method 1: Download from Supabase (Preferred for security/reliability)
+        if (filePath) {
+            console.log('Downloading image from Supabase Storage:', filePath);
+            const { data, error } = await supabase.storage.from('stock-images').download(filePath);
+            if (error || !data) {
+                console.error('Supabase download error:', error);
+                throw new Error(`Failed to download image from storage: ${error?.message}`);
+            }
+            imageBuffer = await data.arrayBuffer();
+            mimeType = data.type || mimeType;
+            console.log('Image downloadable, size:', imageBuffer.byteLength, 'type:', mimeType);
+        } else {
+            // Method 2: Fetch from URL (Fallback)
+            console.log('Fetching image from URL:', imageUrl);
+            const imageResp = await fetch(imageUrl);
+            if (!imageResp.ok) {
+                throw new Error(`Failed to fetch image: ${imageResp.statusText}`);
+            }
+            imageBuffer = await imageResp.arrayBuffer();
+            mimeType = imageResp.headers.get('content-type') || mimeType;
+            console.log('Image fetched from URL, size:', imageBuffer.byteLength);
         }
-        const imageBuffer = await imageResp.arrayBuffer();
-        console.log('Image fetched, size:', imageBuffer.byteLength);
 
         const prompt = `Analyze this image of a product or bill/invoice. 
         Extract the following details in JSON format:
@@ -78,7 +96,7 @@ router.post('/analyze', async (req, res) => {
             {
                 inlineData: {
                     data: Buffer.from(imageBuffer).toString('base64'),
-                    mimeType: imageResp.headers.get('content-type') || 'image/jpeg'
+                    mimeType: mimeType
                 }
             }
         ]);

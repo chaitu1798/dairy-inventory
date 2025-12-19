@@ -150,16 +150,33 @@ export default function PurchasesPage() {
     const uploadImage = async (file: File) => {
         const formData = new FormData();
         formData.append('image', file);
+
+        let uploadData = null;
+
         try {
+            setMessage('Uploading image...');
             // 1. Upload Image
             const res = await api.post('/stock/upload', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            const imageUrl = res.data.url;
-            const filePath = res.data.filePath;
+            uploadData = res.data;
+        } catch (uploadError: any) {
+            console.error('Upload Step Failed:', uploadError);
+            const msg = uploadError.response?.data?.error || uploadError.message || 'Upload failed';
+            setMessage(`Upload Error: ${msg}`);
+            setTimeout(() => setMessage(''), 5000);
+            return;
+        }
+
+        if (!uploadData) return;
+
+        try {
+            const { url: imageUrl, filePath } = uploadData;
 
             // 2. Analyze Image with Gemini
             setMessage('Analyzing image...');
+            console.log('Starting analysis for:', { imageUrl, filePath });
+
             const analyzeRes = await api.post('/stock/analyze', { imageUrl, filePath });
             const { productName, quantity, date } = analyzeRes.data;
 
@@ -190,10 +207,10 @@ export default function PurchasesPage() {
             // Clear message after delay
             setTimeout(() => setMessage(''), 5000);
 
-        } catch (error: any) {
-            console.error('Upload/Analysis failed', error);
-            const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message || 'Failed to analyze image';
-            setMessage(`Error: ${errorMsg}`);
+        } catch (analyzeError: any) {
+            console.error('Analysis Step Failed:', analyzeError);
+            const errorMsg = analyzeError.response?.data?.error || analyzeError.response?.data?.details || analyzeError.message || 'Analysis failed';
+            setMessage(`Analysis Error: ${errorMsg}`);
             setTimeout(() => setMessage(''), 5000);
         }
     };

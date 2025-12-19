@@ -190,10 +190,11 @@ export default function PurchasesPage() {
             // Clear message after delay
             setTimeout(() => setMessage(''), 5000);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Upload/Analysis failed', error);
-            setMessage('Failed to analyze image');
-            setTimeout(() => setMessage(''), 3000);
+            const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message || 'Failed to analyze image';
+            setMessage(`Error: ${errorMsg}`);
+            setTimeout(() => setMessage(''), 5000);
         }
     };
 

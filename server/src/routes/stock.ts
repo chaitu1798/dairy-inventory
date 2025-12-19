@@ -72,10 +72,10 @@ router.post('/analyze', async (req, res) => {
             throw new Error('GEMINI_API_KEY is not set');
         }
 
-        console.log('Initializing Gemini 1.5-flash...');
+        console.log('Initializing Gemini 2.0-flash...');
         const genAI = new GoogleGenerativeAI(key);
-        // Use gemini-1.5-flash-latest as per available models list
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+        // Using gemini-2.0-flash as confirmed in models.json
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         let imageBuffer: ArrayBuffer;
         let mimeType = 'image/jpeg'; // Default, ideally fetch from metadata if possible or guess

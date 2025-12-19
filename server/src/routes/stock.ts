@@ -7,15 +7,21 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Upload image to Supabase Storage
 router.post('/upload', upload.single('image'), async (req, res) => {
+    console.log('--- [POST] /stock/upload request received ---');
     try {
         if (!req.file) {
+            console.error('Error: No image file provided');
             return res.status(400).json({ error: 'No image file provided' });
         }
 
         const file = req.file;
+        console.log(`File received: ${file.originalname}, Size: ${file.size}, Mime: ${file.mimetype}`);
+
         const fileExt = file.originalname.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
+
+        console.log(`Uploading to bucket 'stock-images' as '${filePath}'...`);
 
         const { data, error } = await supabase
             .storage
@@ -25,20 +31,24 @@ router.post('/upload', upload.single('image'), async (req, res) => {
             });
 
         if (error) {
-            console.error('Supabase upload error:', error);
+            console.error('Supabase upload error:', JSON.stringify(error, null, 2));
             return res.status(500).json({ error: 'Failed to upload image', details: error });
         }
 
+        console.log('Upload successful. Fetching Public URL...');
         const { data: { publicUrl } } = supabase
             .storage
             .from('stock-images')
             .getPublicUrl(filePath);
 
+        console.log('Public URL:', publicUrl);
+        console.log('--- [POST] /stock/upload completed ---');
+
         // Return both URL and filePath
         res.json({ url: publicUrl, filePath });
     } catch (error) {
-        console.error('Upload error:', error);
-        res.status(500).json({ error: 'Internal server error during upload' });
+        console.error('CRITICAL Upload error:', error);
+        res.status(500).json({ error: 'Internal server error during upload', details: error instanceof Error ? error.message : String(error) });
     }
 });
 
@@ -46,15 +56,26 @@ router.post('/upload', upload.single('image'), async (req, res) => {
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 router.post('/analyze', async (req, res) => {
+    console.log('--- [POST] /stock/analyze request received ---');
     const { imageUrl, filePath } = req.body;
+    console.log('Params:', { imageUrl, filePath });
 
     if (!imageUrl && !filePath) {
+        console.error('Error: Missing imageUrl and filePath');
         return res.status(400).json({ error: 'Image URL or File Path is required' });
     }
 
     try {
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const key = process.env.GEMINI_API_KEY;
+        if (!key) {
+            console.error('Error: GEMINI_API_KEY missing');
+            throw new Error('GEMINI_API_KEY is not set');
+        }
+
+        console.log('Initializing Gemini 1.5-flash...');
+        const genAI = new GoogleGenerativeAI(key);
+        // Use gemini-1.5-flash-latest as per available models list
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
         let imageBuffer: ArrayBuffer;
         let mimeType = 'image/jpeg'; // Default, ideally fetch from metadata if possible or guess
@@ -91,6 +112,7 @@ router.post('/analyze', async (req, res) => {
         
         Return ONLY the JSON object, no markdown formatting.`;
 
+        console.log('Sending to Gemini...');
         const result = await model.generateContent([
             prompt,
             {
@@ -103,13 +125,14 @@ router.post('/analyze', async (req, res) => {
 
         const response = await result.response;
         const text = response.text();
-        console.log('Gemini response:', text);
+        console.log('Gemini response received:', text);
 
         // Clean up markdown code blocks if present
         const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
         try {
             const data = JSON.parse(jsonStr);
+            console.log('Parsed JSON:', data);
             res.json(data);
         } catch (parseError) {
             console.error('JSON Parse Error:', parseError);
@@ -118,7 +141,7 @@ router.post('/analyze', async (req, res) => {
         }
 
     } catch (error: any) {
-        console.error('Gemini analysis error details:', JSON.stringify(error, null, 2));
+        console.error('CRITICAL Gemini analysis error details:', JSON.stringify(error, null, 2));
         res.status(500).json({ error: 'Failed to analyze image', details: error.message, fullError: error });
     }
 });

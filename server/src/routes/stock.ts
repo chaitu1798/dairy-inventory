@@ -72,36 +72,66 @@ router.post('/analyze', async (req, res) => {
             throw new Error('GEMINI_API_KEY is not set');
         }
 
-        console.log('Initializing Gemini 2.0-flash...');
+        console.log('Initializing Gemini 1.5-flash...');
         const genAI = new GoogleGenerativeAI(key);
-        // Using gemini-2.0-flash as confirmed in models.json
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        // Using gemini-1.5-flash for stability
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         let imageBuffer: ArrayBuffer;
         let mimeType = 'image/jpeg'; // Default, ideally fetch from metadata if possible or guess
 
-        // Method 1: Download from Supabase (Preferred for security/reliability)
+        // Method 1: Download from Supabase
         if (filePath) {
             console.log('Downloading image from Supabase Storage:', filePath);
             const { data, error } = await supabase.storage.from('stock-images').download(filePath);
-            if (error || !data) {
-                console.error('Supabase download error:', error);
-                throw new Error(`Failed to download image from storage: ${error?.message}`);
+
+            if (!error && data) {
+                imageBuffer = await data.arrayBuffer();
+                mimeType = data.type || mimeType;
+                console.log('Image downloadable, size:', imageBuffer.byteLength, 'type:', mimeType);
+            } else {
+                console.warn('Supabase download failed, attempting Signed URL. Error:', error?.message);
+
+                // Try Signed URL (Works for private buckets if we have permission)
+                const { data: signedData, error: signedError } = await supabase
+                    .storage
+                    .from('stock-images')
+                    .createSignedUrl(filePath, 60);
+
+                if (signedData?.signedUrl) {
+                    console.log('Fetching from Signed URL...');
+                    const signedResp = await fetch(signedData.signedUrl);
+                    if (signedResp.ok) {
+                        imageBuffer = await signedResp.arrayBuffer();
+                        mimeType = signedResp.headers.get('content-type') || mimeType;
+                        console.log('Image fetched from Signed URL, size:', imageBuffer.byteLength);
+                    } else {
+                        console.error('Failed to fetch Signed URL:', signedResp.statusText);
+                    }
+                } else {
+                    console.error('Failed to create Signed URL:', signedError?.message);
+                }
             }
-            imageBuffer = await data.arrayBuffer();
-            mimeType = data.type || mimeType;
-            console.log('Image downloadable, size:', imageBuffer.byteLength, 'type:', mimeType);
-        } else {
-            // Method 2: Fetch from URL (Fallback)
-            console.log('Fetching image from URL:', imageUrl);
+        }
+
+        // Method 2: Fetch from URL (Last resort - for Public buckets)
+        if (!imageBuffer! && imageUrl) {
+            console.log('Fetching image from Public URL:', imageUrl);
             const imageResp = await fetch(imageUrl);
             if (!imageResp.ok) {
-                throw new Error(`Failed to fetch image: ${imageResp.statusText}`);
+                // Don't throw yet, we might have failed everywhere
+                console.error(`Failed to fetch image from URL: ${imageResp.statusText}`);
+            } else {
+                imageBuffer = await imageResp.arrayBuffer();
+                mimeType = imageResp.headers.get('content-type') || mimeType;
+                console.log('Image fetched from Public URL, size:', imageBuffer.byteLength);
             }
-            imageBuffer = await imageResp.arrayBuffer();
-            mimeType = imageResp.headers.get('content-type') || mimeType;
-            console.log('Image fetched from URL, size:', imageBuffer.byteLength);
         }
+
+        if (!imageBuffer!) {
+            throw new Error("Failed to retrieve image data from Storage, Signed URL, or Public URL. Check bucket permissions.");
+        }
+
 
         const prompt = `Analyze this image of a product or bill/invoice. 
         Extract the following details in JSON format:

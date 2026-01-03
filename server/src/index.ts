@@ -9,7 +9,9 @@ import customersRoutes from './routes/customers';
 import paymentsRoutes from './routes/payments';
 import arRoutes from './routes/accounts_receivable';
 import stockRoutes from './routes/stock';
+import uploadRouter from './routes/upload'; // [NEW]
 import { supabase } from './supabase';
+import { startMcpServer } from './mcpServer'; // [NEW] Import MCP starter
 
 import dotenv from 'dotenv';
 
@@ -74,6 +76,8 @@ app.use('/customers', customersRoutes);
 app.use('/payments', paymentsRoutes);
 app.use('/ar', arRoutes);
 app.use('/stock', stockRoutes);
+app.use('/upload', uploadRouter); // [NEW] Mount upload route
+
 
 app.get('/supabase-test', async (req, res) => {
     const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });
@@ -102,6 +106,7 @@ const initCalendar = async () => {
         console.log('Calendar months initialized');
     }
 };
+
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);

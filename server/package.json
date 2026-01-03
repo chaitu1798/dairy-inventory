@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "@supabase/supabase-js": "^2.39.0",
     "@types/node-fetch": "^2.6.13",
     "cors": "^2.8.5",

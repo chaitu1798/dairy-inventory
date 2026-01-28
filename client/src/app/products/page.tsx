@@ -2,10 +2,15 @@
 
 import { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api';
-import { Plus, Trash2, Edit2, AlertTriangle, Camera, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, AlertTriangle, Camera, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function ProductsPage() {
     const [products, setProducts] = useState<any[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const ITEMS_PER_PAGE = 50;
+
     const [formData, setFormData] = useState({
         name: '',
         category: '',
@@ -28,13 +33,19 @@ export default function ProductsPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        fetchProducts();
-    }, []);
+        fetchProducts(currentPage);
+    }, [currentPage]);
 
-    const fetchProducts = async () => {
+    const fetchProducts = async (page = currentPage) => {
         try {
-            const res = await api.get('/products');
-            setProducts(res.data);
+            const res = await api.get(`/products?page=${page}&limit=${ITEMS_PER_PAGE}`);
+            if (res.data.data) {
+                setProducts(res.data.data);
+                setTotalPages(res.data.totalPages);
+                setTotalItems(res.data.count);
+            } else {
+                setProducts(res.data);
+            }
         } catch (error) {
             console.error('Error fetching products:', error);
         }
@@ -349,6 +360,34 @@ export default function ProductsPage() {
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-md mt-4">
+                    <span className="text-sm text-gray-600">
+                        Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} entries
+                    </span>
+                    <div className="flex space-x-2">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className={`p-2 rounded border ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-50 text-gray-700'}`}
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <span className="flex items-center px-4 font-medium text-gray-700">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className={`p-2 rounded border ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-50 text-gray-700'}`}
+                        >
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Stock Update Modal */}
             {showStockModal && (

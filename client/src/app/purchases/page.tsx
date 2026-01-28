@@ -2,16 +2,22 @@
 
 import { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api';
-import { Plus, Calendar, Trash2, Edit2, Camera, X } from 'lucide-react';
+import { Plus, Calendar, Trash2, Edit2, Camera, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function PurchasesPage() {
     const [products, setProducts] = useState<any[]>([]);
     const [purchases, setPurchases] = useState<any[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const ITEMS_PER_PAGE = 50;
+
     const [formData, setFormData] = useState({
         product_id: '',
         quantity: '',
         purchase_date: new Date().toISOString().split('T')[0],
-        expiry_date: ''
+        expiry_date: '',
+        image_url: '' // Added image_url
     });
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [message, setMessage] = useState('');
@@ -32,8 +38,11 @@ export default function PurchasesPage() {
 
     useEffect(() => {
         fetchProducts();
-        fetchPurchases();
-    }, [dateRange]);
+    }, []);
+
+    useEffect(() => {
+        fetchPurchases(currentPage);
+    }, [dateRange, currentPage]);
 
     useEffect(() => {
         // Auto-calculate expiry date if product has expiry tracking
@@ -52,17 +61,30 @@ export default function PurchasesPage() {
 
     const fetchProducts = async () => {
         try {
-            const res = await api.get('/products');
-            setProducts(res.data);
+            const res = await api.get('/products?limit=1000'); // Fetch all products for dropdown
+            if (res.data && res.data.data) {
+                setProducts(res.data.data);
+            } else if (Array.isArray(res.data)) {
+                setProducts(res.data);
+            } else {
+                setProducts([]);
+            }
         } catch (error) {
             console.error('Error fetching products:', error);
+            setProducts([]);
         }
     };
 
-    const fetchPurchases = async () => {
+    const fetchPurchases = async (page = currentPage) => {
         try {
-            const res = await api.get(`/purchases?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
-            setPurchases(res.data);
+            const res = await api.get(`/purchases?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&page=${page}&limit=${ITEMS_PER_PAGE}`);
+            if (res.data.data) {
+                setPurchases(res.data.data);
+                setTotalPages(res.data.totalPages);
+                setTotalItems(res.data.count);
+            } else {
+                setPurchases(res.data);
+            }
         } catch (error) {
             console.error('Error fetching purchases:', error);
         }
@@ -89,7 +111,8 @@ export default function PurchasesPage() {
                 product_id: '',
                 quantity: '',
                 purchase_date: new Date().toISOString().split('T')[0],
-                expiry_date: ''
+                expiry_date: '',
+                image_url: ''
             });
             setSelectedProduct(null);
             setIsEditing(false);
@@ -109,7 +132,8 @@ export default function PurchasesPage() {
             product_id: purchase.product_id,
             quantity: purchase.quantity,
             purchase_date: purchase.purchase_date,
-            expiry_date: purchase.expiry_date || ''
+            expiry_date: purchase.expiry_date || '',
+            image_url: '' // Initialize as empty for now
         });
         setIsEditing(true);
         setEditId(purchase.id);
@@ -136,7 +160,8 @@ export default function PurchasesPage() {
             product_id: '',
             quantity: '',
             purchase_date: new Date().toISOString().split('T')[0],
-            expiry_date: ''
+            expiry_date: '',
+            image_url: ''
         });
     };
 
@@ -156,9 +181,7 @@ export default function PurchasesPage() {
         try {
             setMessage('Uploading image...');
             // 1. Upload Image
-            const res = await api.post('/stock/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            const res = await api.post('/stock/upload', formData);
             uploadData = res.data;
         } catch (uploadError: any) {
             console.error('Upload Step Failed:', uploadError);
@@ -176,6 +199,9 @@ export default function PurchasesPage() {
             // 2. Analyze Image with Gemini
             setMessage('Analyzing image...');
             console.log('Starting analysis for:', { imageUrl, filePath });
+
+            // Store image URL in form data
+            setFormData(prev => ({ ...prev, image_url: imageUrl || '' }));
 
             const analyzeRes = await api.post('/stock/analyze', { imageUrl, filePath });
             const { productName, quantity, date } = analyzeRes.data;
@@ -368,14 +394,20 @@ export default function PurchasesPage() {
                         <input
                             type="date"
                             value={dateRange.startDate}
-                            onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                            onChange={(e) => {
+                                setDateRange({ ...dateRange, startDate: e.target.value });
+                                setCurrentPage(1);
+                            }}
                             className="border p-2 rounded text-sm"
                         />
                         <span className="text-gray-500">to</span>
                         <input
                             type="date"
                             value={dateRange.endDate}
-                            onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                            onChange={(e) => {
+                                setDateRange({ ...dateRange, endDate: e.target.value });
+                                setCurrentPage(1);
+                            }}
                             className="border p-2 rounded text-sm"
                         />
                     </div>
@@ -440,6 +472,34 @@ export default function PurchasesPage() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="flex justify-between items-center bg-gray-50 p-4 border-t">
+                        <span className="text-sm text-gray-600">
+                            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} entries
+                        </span>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className={`p-2 rounded border ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-100 text-gray-700 shadow-sm'}`}
+                            >
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <span className="flex items-center px-4 font-medium text-gray-700 bg-white border rounded">
+                                {currentPage} / {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className={`p-2 rounded border ${currentPage === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-100 text-gray-700 shadow-sm'}`}
+                            >
+                                <ChevronRight className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Stock Update Modal */}

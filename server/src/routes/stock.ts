@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
+import { requireAuth } from '../middleware/auth';
 import multer from 'multer';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Upload image to Supabase Storage
-router.post('/upload', upload.single('image'), async (req, res) => {
+router.post('/upload', requireAuth, upload.single('image'), async (req, res) => {
     console.log('--- [POST] /stock/upload request received ---');
     try {
         if (!req.file) {
@@ -17,28 +18,35 @@ router.post('/upload', upload.single('image'), async (req, res) => {
         const file = req.file;
         console.log(`File received: ${file.originalname}, Size: ${file.size}, Mime: ${file.mimetype}`);
 
+        // Sanitize filename
         const fileExt = file.originalname.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${fileName}`;
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${fileName}`; // Could add folder like 'uploads/${fileName}' if needed
 
-        console.log(`Uploading to bucket 'stock-images' as '${filePath}'...`);
+        console.log(`Uploading to bucket 'product-images' as '${filePath}'...`);
 
+        // Use shared supabase client
         const { data, error } = await supabase
             .storage
-            .from('stock-images')
+            .from('product-images')
             .upload(filePath, file.buffer, {
-                contentType: file.mimetype
+                contentType: file.mimetype,
+                upsert: true
             });
 
         if (error) {
             console.error('Supabase upload error:', JSON.stringify(error, null, 2));
-            return res.status(500).json({ error: 'Failed to upload image', details: error });
+            // Check for specific error types if needed (e.g. bucket not found)
+            return res.status(500).json({
+                error: 'Failed to upload image',
+                details: error.message || 'Unknown Supabase error'
+            });
         }
 
         console.log('Upload successful. Fetching Public URL...');
         const { data: { publicUrl } } = supabase
             .storage
-            .from('stock-images')
+            .from('product-images')
             .getPublicUrl(filePath);
 
         console.log('Public URL:', publicUrl);
@@ -48,14 +56,18 @@ router.post('/upload', upload.single('image'), async (req, res) => {
         res.json({ url: publicUrl, filePath });
     } catch (error) {
         console.error('CRITICAL Upload error:', error);
-        res.status(500).json({ error: 'Internal server error during upload', details: error instanceof Error ? error.message : String(error) });
+        res.status(500).json({
+            error: 'Internal server error during upload',
+            details: error instanceof Error ? error.message : String(error)
+        });
+        return;
     }
 });
 
 // Analyze image using Gemini 1.5 Flash
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-router.post('/analyze', async (req, res) => {
+router.post('/analyze', requireAuth, async (req, res) => {
     console.log('--- [POST] /stock/analyze request received ---');
     const { imageUrl, filePath } = req.body;
     console.log('Params:', { imageUrl, filePath });
@@ -83,7 +95,7 @@ router.post('/analyze', async (req, res) => {
         // Method 1: Download from Supabase
         if (filePath) {
             console.log('Downloading image from Supabase Storage:', filePath);
-            const { data, error } = await supabase.storage.from('stock-images').download(filePath);
+            const { data, error } = await supabase.storage.from('product-images').download(filePath);
 
             if (!error && data) {
                 imageBuffer = await data.arrayBuffer();
@@ -95,7 +107,7 @@ router.post('/analyze', async (req, res) => {
                 // Try Signed URL (Works for private buckets if we have permission)
                 const { data: signedData, error: signedError } = await supabase
                     .storage
-                    .from('stock-images')
+                    .from('product-images')
                     .createSignedUrl(filePath, 60);
 
                 if (signedData?.signedUrl) {
@@ -177,7 +189,7 @@ router.post('/analyze', async (req, res) => {
 });
 
 // Update stock based on image capture
-router.post('/update', async (req, res) => {
+router.post('/update', requireAuth, async (req, res) => {
     const { productId, quantity, actionType, imageUrl } = req.body;
 
     if (!productId || !quantity || !actionType) {

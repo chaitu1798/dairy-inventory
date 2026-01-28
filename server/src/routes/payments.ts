@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get('/:sale_id', async (req, res) => {
 });
 
 // Record a payment
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
     const { sale_id, amount, payment_date, payment_method, notes } = req.body;
 
     // 1. Record payment

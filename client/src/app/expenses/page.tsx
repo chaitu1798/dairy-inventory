@@ -2,10 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Plus, Trash2, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function ExpensesPage() {
     const [expenses, setExpenses] = useState<any[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const ITEMS_PER_PAGE = 50;
+
     const [formData, setFormData] = useState({
         category: '',
         amount: '',
@@ -21,13 +26,19 @@ export default function ExpensesPage() {
     });
 
     useEffect(() => {
-        fetchExpenses();
-    }, [dateRange]);
+        fetchExpenses(currentPage);
+    }, [dateRange, currentPage]);
 
-    const fetchExpenses = async () => {
+    const fetchExpenses = async (page = currentPage) => {
         try {
-            const res = await api.get(`/expenses?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
-            setExpenses(res.data);
+            const res = await api.get(`/expenses?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&page=${page}&limit=${ITEMS_PER_PAGE}`);
+            if (res.data.data) {
+                setExpenses(res.data.data);
+                setTotalPages(res.data.totalPages);
+                setTotalItems(res.data.count);
+            } else {
+                setExpenses(res.data);
+            }
         } catch (error) {
             console.error('Error fetching expenses:', error);
         }
@@ -182,14 +193,20 @@ export default function ExpensesPage() {
                         <input
                             type="date"
                             value={dateRange.startDate}
-                            onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                            onChange={(e) => {
+                                setDateRange({ ...dateRange, startDate: e.target.value });
+                                setCurrentPage(1);
+                            }}
                             className="border p-2 rounded text-sm"
                         />
                         <span className="text-gray-500">to</span>
                         <input
                             type="date"
                             value={dateRange.endDate}
-                            onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                            onChange={(e) => {
+                                setDateRange({ ...dateRange, endDate: e.target.value });
+                                setCurrentPage(1);
+                            }}
                             className="border p-2 rounded text-sm"
                         />
                     </div>
@@ -246,6 +263,34 @@ export default function ExpensesPage() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="flex justify-between items-center bg-gray-50 p-4 border-t">
+                        <span className="text-sm text-gray-600">
+                            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} entries
+                        </span>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className={`p-2 rounded border ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-100 text-gray-700 shadow-sm'}`}
+                            >
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <span className="flex items-center px-4 font-medium text-gray-700 bg-white border rounded">
+                                {currentPage} / {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className={`p-2 rounded border ${currentPage === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-100 text-gray-700 shadow-sm'}`}
+                            >
+                                <ChevronRight className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

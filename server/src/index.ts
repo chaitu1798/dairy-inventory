@@ -17,9 +17,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+import compression from 'compression'; // [NEW]
+
 const app = express();
 const port = process.env.PORT || 3001;
 
+app.use(compression()); // [NEW] Compress all routes
 app.use(express.json());
 
 // Configure CORS to allow frontend domains
@@ -109,7 +112,21 @@ const initCalendar = async () => {
 
 
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-    console.log('Transaction routes loaded');
+    console.log(`\n--- Server Started ---`);
+    console.log(`Local: http://localhost:${port}`);
+
+    // Environment Check
+    const requiredEnv = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'GEMINI_API_KEY'];
+    const missingEnv = requiredEnv.filter(key => !process.env[key]);
+
+    if (missingEnv.length > 0) {
+        console.error(`\n❌ CRITICAL ERROR: Missing environment variables: ${missingEnv.join(', ')}`);
+        console.error('Server may crash or fail to upload images.\n');
+        // We don't exit process.exit(1) to allow dev debugging, but logging is critical
+    } else {
+        console.log('✅ Environment check passed');
+    }
+
+    console.log('Stock/Upload routes loaded');
     initCalendar();
 });

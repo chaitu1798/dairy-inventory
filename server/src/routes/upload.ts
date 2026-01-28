@@ -3,12 +3,13 @@ import { Router } from 'express';
 import { upload } from '../imageUpload';
 import { analyzeImage } from '../analyzeImage';
 import { updateStockFromImage } from '../imageTool';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
 // Endpoint: POST /upload
 // Process: Upload -> Analyze -> Update Stock -> Return Result
-router.post('/', upload.single('image'), async (req, res) => {
+router.post('/', requireAuth, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: "No image file provided" });

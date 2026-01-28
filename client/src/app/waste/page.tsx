@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function WastePage() {
     const [products, setProducts] = useState<any[]>([]);
@@ -17,12 +17,19 @@ export default function WastePage() {
         notes: ''
     });
     const [message, setMessage] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const ITEMS_PER_PAGE = 50;
 
     useEffect(() => {
         fetchProducts();
-        fetchWasteRecords();
         fetchSummary();
     }, []);
+
+    useEffect(() => {
+        fetchWasteRecords(currentPage);
+    }, [currentPage]);
 
     useEffect(() => {
         // Auto-calculate cost value when product and quantity change
@@ -37,17 +44,30 @@ export default function WastePage() {
 
     const fetchProducts = async () => {
         try {
-            const res = await api.get('/products');
-            setProducts(res.data);
+            const res = await api.get('/products?limit=1000');
+            if (res.data && res.data.data) {
+                setProducts(res.data.data);
+            } else if (Array.isArray(res.data)) {
+                setProducts(res.data);
+            } else {
+                setProducts([]);
+            }
         } catch (error) {
             console.error('Error fetching products:', error);
+            setProducts([]);
         }
     };
 
-    const fetchWasteRecords = async () => {
+    const fetchWasteRecords = async (page = currentPage) => {
         try {
-            const res = await api.get('/waste');
-            setWasteRecords(res.data);
+            const res = await api.get(`/waste?page=${page}&limit=${ITEMS_PER_PAGE}`);
+            if (res.data.data) {
+                setWasteRecords(res.data.data);
+                setTotalPages(res.data.totalPages);
+                setTotalItems(res.data.count);
+            } else {
+                setWasteRecords(res.data);
+            }
         } catch (error) {
             console.error('Error fetching waste records:', error);
         }
@@ -289,6 +309,34 @@ export default function WastePage() {
                     </table>
                 </div>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg shadow-md">
+                    <span className="text-sm text-gray-600">
+                        Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} entries
+                    </span>
+                    <div className="flex space-x-2">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className={`p-2 rounded border ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-100 text-gray-700 shadow-sm'}`}
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <span className="flex items-center px-4 font-medium text-gray-700 bg-white border rounded">
+                            {currentPage} / {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className={`p-2 rounded border ${currentPage === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-100 text-gray-700 shadow-sm'}`}
+                        >
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

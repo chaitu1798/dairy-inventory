@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create customer
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
     const { name, phone, email, address, credit_limit } = req.body;
     const { data, error } = await supabase
         .from('customers')
@@ -27,7 +28,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update customer
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     const { data, error } = await supabase
@@ -41,7 +42,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete customer
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
 
     // Unlink related sales first (set customer_id to null)

@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
 // Purchases
 router.get('/purchases', async (req, res) => {
     const { startDate, endDate } = req.query;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
+
     let query = supabase
         .from('purchases')
         .select(`
@@ -14,20 +20,27 @@ router.get('/purchases', async (req, res) => {
                 name,
                 unit
             )
-        `)
-        .order('purchase_date', { ascending: false });
+        `, { count: 'exact' })
+        .order('purchase_date', { ascending: false })
+        .range(start, end);
 
     if (startDate) query = query.gte('purchase_date', startDate);
     if (endDate) query = query.lte('purchase_date', endDate);
 
-    const { data, error } = await query;
+    const { data, count, error } = await query;
 
     if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
+
+    res.json({
+        data,
+        count,
+        page,
+        totalPages: count ? Math.ceil(count / limit) : 0
+    });
 });
 
-router.post('/purchases', async (req, res) => {
-    const { product_id, quantity, purchase_date, expiry_date } = req.body;
+router.post('/purchases', requireAuth, async (req, res) => {
+    const { product_id, quantity, purchase_date, expiry_date, image_url } = req.body;
 
     // Fetch product cost price
     const { data: product, error: productError } = await supabase
@@ -48,10 +61,27 @@ router.post('/purchases', async (req, res) => {
         .select();
 
     if (error) return res.status(400).json({ error: error.message });
+
+    // Log to stock_logs
+    const { error: logError } = await supabase
+        .from('stock_logs')
+        .insert([{
+            product_id,
+            quantity: quantity,
+            action_type: 'IN', // Purchase is adding stock
+            image_url: image_url || null,
+            updated_by: 'system' // or could be req.user.id if auth was fully implemented
+        }]);
+
+    if (logError) {
+        console.error('Error logging stock update:', logError);
+        // We ensure purchase succeeded, so we don't fail request here, just log error
+    }
+
     res.json(data);
 });
 
-router.put('/purchases/:id', async (req, res) => {
+router.put('/purchases/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     const { data, error } = await supabase
@@ -64,7 +94,7 @@ router.put('/purchases/:id', async (req, res) => {
     res.json(data);
 });
 
-router.delete('/purchases/:id', async (req, res) => {
+router.delete('/purchases/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const { error } = await supabase.from('purchases').delete().eq('id', id);
     if (error) return res.status(400).json({ error: error.message });
@@ -74,6 +104,11 @@ router.delete('/purchases/:id', async (req, res) => {
 // Sales
 router.get('/sales', async (req, res) => {
     const { startDate, endDate } = req.query;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
+
     let query = supabase
         .from('sales')
         .select(`
@@ -85,19 +120,26 @@ router.get('/sales', async (req, res) => {
             customers (
                 name
             )
-        `)
-        .order('sale_date', { ascending: false });
+        `, { count: 'exact' })
+        .order('sale_date', { ascending: false })
+        .range(start, end);
 
     if (startDate) query = query.gte('sale_date', startDate);
     if (endDate) query = query.lte('sale_date', endDate);
 
-    const { data, error } = await query;
+    const { data, count, error } = await query;
 
     if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
+
+    res.json({
+        data,
+        count,
+        page,
+        totalPages: count ? Math.ceil(count / limit) : 0
+    });
 });
 
-router.post('/sales', async (req, res) => {
+router.post('/sales', requireAuth, async (req, res) => {
     const { product_id, quantity, sale_date, customer_id, status, due_date } = req.body;
 
     // Fetch product selling price
@@ -134,7 +176,7 @@ router.post('/sales', async (req, res) => {
     res.json(data);
 });
 
-router.put('/sales/:id', async (req, res) => {
+router.put('/sales/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     const { data, error } = await supabase
@@ -147,7 +189,7 @@ router.put('/sales/:id', async (req, res) => {
     res.json(data);
 });
 
-router.delete('/sales/:id', async (req, res) => {
+router.delete('/sales/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
 
     // Delete related payments first (manual cascade)
@@ -162,21 +204,33 @@ router.delete('/sales/:id', async (req, res) => {
 // Expenses
 router.get('/expenses', async (req, res) => {
     const { startDate, endDate } = req.query;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
+
     let query = supabase
         .from('expenses')
-        .select('*')
-        .order('expense_date', { ascending: false });
+        .select('*', { count: 'exact' })
+        .order('expense_date', { ascending: false })
+        .range(start, end);
 
     if (startDate) query = query.gte('expense_date', startDate);
     if (endDate) query = query.lte('expense_date', endDate);
 
-    const { data, error } = await query;
+    const { data, count, error } = await query;
 
     if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
+
+    res.json({
+        data,
+        count,
+        page,
+        totalPages: count ? Math.ceil(count / limit) : 0
+    });
 });
 
-router.post('/expenses', async (req, res) => {
+router.post('/expenses', requireAuth, async (req, res) => {
     const { category, amount, notes, expense_date } = req.body;
     const { data, error } = await supabase
         .from('expenses')
@@ -187,7 +241,7 @@ router.post('/expenses', async (req, res) => {
     res.json(data);
 });
 
-router.put('/expenses/:id', async (req, res) => {
+router.put('/expenses/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     const { data, error } = await supabase
@@ -200,7 +254,7 @@ router.put('/expenses/:id', async (req, res) => {
     res.json(data);
 });
 
-router.delete('/expenses/:id', async (req, res) => {
+router.delete('/expenses/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const { error } = await supabase.from('expenses').delete().eq('id', id);
     if (error) return res.status(400).json({ error: error.message });

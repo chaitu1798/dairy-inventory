@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
 // Create waste record
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
     const { product_id, quantity, reason, cost_value, waste_date, notes } = req.body;
 
     // Validate reason
@@ -24,6 +25,10 @@ router.post('/', async (req, res) => {
 // Get waste records with optional date filtering
 router.get('/', async (req, res) => {
     const { start_date, end_date } = req.query;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
 
     let query = supabase
         .from('waste')
@@ -35,8 +40,9 @@ router.get('/', async (req, res) => {
                 category,
                 unit
             )
-        `)
-        .order('waste_date', { ascending: false });
+        `, { count: 'exact' })
+        .order('waste_date', { ascending: false })
+        .range(start, end);
 
     if (start_date) {
         query = query.gte('waste_date', start_date);
@@ -45,9 +51,15 @@ router.get('/', async (req, res) => {
         query = query.lte('waste_date', end_date);
     }
 
-    const { data, error } = await query;
+    const { data, count, error } = await query;
     if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
+
+    res.json({
+        data,
+        count,
+        page,
+        totalPages: count ? Math.ceil(count / limit) : 0
+    });
 });
 
 // Get waste summary statistics

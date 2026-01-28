@@ -36,11 +36,20 @@ export default function AccountsReceivablePage() {
             // We might need a specific endpoint for this or filter client-side for now
             // Ideally: GET /sales?status=pending,overdue
             // For now, let's just fetch all sales and filter (not efficient for large data but okay for MVP)
-            const res = await api.get('/sales');
-            const unpaidInvoices = res.data.filter((s: any) => s.status === 'pending' || s.status === 'overdue');
+            const res = await api.get('/sales?limit=1000');
+
+            let allSales = [];
+            if (res.data && res.data.data) {
+                allSales = res.data.data;
+            } else if (Array.isArray(res.data)) {
+                allSales = res.data;
+            }
+
+            const unpaidInvoices = allSales.filter((s: any) => s.status === 'pending' || s.status === 'overdue');
             setInvoices(unpaidInvoices);
         } catch (error) {
             console.error('Error fetching invoices:', error);
+            setInvoices([]);
         }
     };
 

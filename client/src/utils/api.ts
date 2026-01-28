@@ -34,15 +34,23 @@ api.interceptors.request.use(request => {
         try {
             const userStr = localStorage.getItem('dairy_user');
             if (userStr) {
-                const user = JSON.parse(userStr);
-                // Supabase typically returns { user, session: { access_token: "..." } } 
-                // OR sometimes just the session depending on how it was stored.
-                // Based on AuthContext.tsx, it stores what signIpWithPassword returns, which is { user, session }.
+                const userData = JSON.parse(userStr);
 
-                const token = user?.session?.access_token;
+                // Try to find the access token in various common Supabase locations
+                // 1. userData.session.access_token (standard)
+                // 2. userData.access_token (if just session stored)
+                // 3. userData.data.session.access_token (if raw response stored)
+
+                let token = userData?.session?.access_token || userData?.access_token;
+
+                if (!token && userData?.data?.session?.access_token) {
+                    token = userData.data.session.access_token;
+                }
 
                 if (token) {
                     request.headers.Authorization = `Bearer ${token}`;
+                } else {
+                    console.warn('User logged in but no access token found in storage');
                 }
             }
         } catch (e) {
@@ -52,6 +60,23 @@ api.interceptors.request.use(request => {
 
     return request;
 });
+
+// Response interceptor to handle authentication errors
+api.interceptors.response.use(
+    (response) => {
+        return response;
+    },
+    (error) => {
+        if (error.response && error.response.status === 401) {
+            console.warn('Unauthorized access. Redirecting to login...');
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('dairy_user');
+                window.location.href = '/login';
+            }
+        }
+        return Promise.reject(error);
+    }
+);
 
 export default api;
 

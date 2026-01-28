@@ -15,8 +15,9 @@ export default function LoginPage() {
         e.preventDefault();
         try {
             const res = await api.post('/auth/login', { email, password });
-            if (res.data.user) {
-                login(res.data.user);
+            // Should store the whole response or session, not just user object if it doesn't contain the token
+            if (res.data) {
+                login(res.data);
             } else {
                 setError('Invalid credentials');
             }

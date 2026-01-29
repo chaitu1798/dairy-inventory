@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { DollarSign, Clock, AlertCircle, CheckCircle, Calendar } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AccountsReceivablePage() {
     const [stats, setStats] = useState({
@@ -76,11 +77,13 @@ export default function AccountsReceivablePage() {
             setSelectedInvoice(null);
             setPaymentAmount('');
             fetchStats();
+            setPaymentAmount('');
+            fetchStats();
             fetchInvoices();
-            alert('Payment recorded successfully!');
+            toast.success('Payment recorded successfully!');
         } catch (error) {
             console.error('Error recording payment:', error);
-            alert('Failed to record payment');
+            toast.error('Failed to record payment');
         }
     };
 
@@ -208,15 +211,19 @@ export default function AccountsReceivablePage() {
                         <form onSubmit={submitPayment} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Amount</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={paymentAmount}
-                                    onChange={(e) => setPaymentAmount(e.target.value)}
-                                    className="w-full mt-1 border p-2 rounded"
-                                    required
-                                    max={selectedInvoice.total - (selectedInvoice.amount_paid || 0)}
-                                />
+                                <div className="relative mt-1">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={paymentAmount}
+                                        onChange={(e) => setPaymentAmount(e.target.value)}
+                                        className="w-full border p-2 pl-9 rounded"
+                                        required
+                                        max={selectedInvoice.total - (selectedInvoice.amount_paid || 0)}
+                                        autoFocus
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Payment Method</label>

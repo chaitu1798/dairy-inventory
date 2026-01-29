@@ -4,63 +4,96 @@ import { useState } from 'react';
 import Link from 'next/link';
 import api from '../../utils/api';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import Input from '../../components/ui/Input';
+import { Button } from '../../components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '../../components/ui/Card';
+
+const signupSchema = z.object({
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+type SignupFormData = z.infer<typeof signupSchema>;
 
 export default function SignupPage() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
+    const [serverError, setServerError] = useState('');
     const router = useRouter();
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting },
+    } = useForm<SignupFormData>({
+        resolver: zodResolver(signupSchema),
+    });
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const onSubmit = async (data: SignupFormData) => {
+        setServerError('');
         try {
-            const res = await api.post('/auth/signup', { email, password });
+            const res = await api.post('/auth/signup', data);
             if (res.data.user) {
+                toast.success('Account created successfully! Please sign in.');
                 router.push('/login');
             }
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Signup failed');
+            console.error('Signup error:', err);
+            setServerError(err.response?.data?.error || 'Signup failed. Please try again.');
         }
     };
 
     return (
-        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-            <h2 className="text-3xl font-bold text-center text-gray-900">Sign Up</h2>
-            {error && <div className="p-3 text-red-500 bg-red-100 rounded">{error}</div>}
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Email</label>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full px-3 py-2 mt-1 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        required
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Password</label>
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full px-3 py-2 mt-1 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        required
-                    />
-                </div>
-                <button
-                    type="submit"
-                    className="w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                >
-                    Sign Up
-                </button>
-            </form>
-            <p className="text-center text-sm text-gray-600">
-                Already have an account?{' '}
-                <Link href="/login" className="text-blue-600 hover:underline">
-                    Login
-                </Link>
-            </p>
+        <div className="flex items-center justify-center min-h-screen bg-muted/30 p-4">
+            <Card className="w-full max-w-md shadow-lg border-2">
+                <CardHeader className="space-y-1 text-center">
+                    <div className="mx-auto w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-2 shadow-lg shadow-primary/30">
+                        <span className="text-white font-bold text-2xl">D</span>
+                    </div>
+                    <CardTitle className="text-2xl font-bold tracking-tight">Create an account</CardTitle>
+                    <CardDescription>
+                        Enter your email below to create your account
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {serverError && (
+                        <div className="p-3 mb-4 text-sm text-destructive bg-destructive/10 rounded-md border border-destructive/20 font-medium" role="alert">
+                            {serverError}
+                        </div>
+                    )}
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+                        <Input
+                            label="Email"
+                            type="email"
+                            {...register('email')}
+                            error={errors.email}
+                            placeholder="name@example.com"
+                        />
+                        <Input
+                            label="Password"
+                            type="password"
+                            {...register('password')}
+                            error={errors.password}
+                            placeholder="Min. 6 characters"
+                        />
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            size="lg"
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? 'Creating account...' : 'Create account'}
+                        </Button>
+                    </form>
+                </CardContent>
+                <CardFooter className="justify-center text-sm text-muted-foreground">
+                    Already have an account?{' '}
+                    <Link href="/login" className="text-primary font-medium hover:underline ml-1">
+                        Sign in
+                    </Link>
+                </CardFooter>
+            </Card>
         </div>
     );
 }

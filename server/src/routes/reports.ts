@@ -265,11 +265,36 @@ router.get('/monthly', async (req, res) => {
     res.json(filtered);
 });
 
-// Inventory report
+// Inventory report with pagination, search, and sort
 router.get('/inventory', async (req, res) => {
-    const { data, error } = await supabase.from('inventory').select('*');
+    const { page = 1, limit = 10, search = '', sortBy = 'name', sortOrder = 'asc' } = req.query;
+    const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+    let query = supabase
+        .from('inventory')
+        .select('*', { count: 'exact' });
+
+    // Search filter
+    if (search) {
+        query = query.ilike('name', `%${search}%`);
+    }
+
+    // Sorting
+    query = query.order(sortBy as string, { ascending: sortOrder === 'asc' });
+
+    // Pagination
+    query = query.range(offset, offset + parseInt(limit as string) - 1);
+
+    const { data, count, error } = await query;
+
     if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
+    res.json({
+        data,
+        count,
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        totalPages: Math.ceil((count || 0) / parseInt(limit as string))
+    });
 });
 
 // Expiring items

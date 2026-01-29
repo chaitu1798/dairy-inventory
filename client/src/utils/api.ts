@@ -27,6 +27,11 @@ if (api.defaults.baseURL?.endsWith('/api/')) {
 
 // Request interceptor to add Auth token
 api.interceptors.request.use(request => {
+    // Dispatch event to show global spinner
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('axios-request-start'));
+    }
+
     console.log('[API Request]:', request.method?.toUpperCase(), request.url, 'Base:', request.baseURL);
 
     // Add Authorization header if user is logged in
@@ -59,14 +64,26 @@ api.interceptors.request.use(request => {
     }
 
     return request;
+}, error => {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('axios-request-end'));
+    }
+    return Promise.reject(error);
 });
 
 // Response interceptor to handle authentication errors
 api.interceptors.response.use(
     (response) => {
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('axios-request-end'));
+        }
         return response;
     },
     (error) => {
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('axios-request-end'));
+        }
+
         if (error.response && error.response.status === 401) {
             console.warn('Unauthorized access. Redirecting to login...');
             if (typeof window !== 'undefined') {

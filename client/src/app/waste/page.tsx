@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Plus, Trash2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function WastePage() {
     const [products, setProducts] = useState<any[]>([]);
@@ -16,7 +17,7 @@ export default function WastePage() {
         waste_date: new Date().toISOString().split('T')[0],
         notes: ''
     });
-    const [message, setMessage] = useState('');
+    // Removed message state
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
@@ -86,7 +87,7 @@ export default function WastePage() {
         e.preventDefault();
         try {
             await api.post('/waste', formData);
-            setMessage('Waste record created successfully!');
+            toast.success('Waste record created successfully!');
             setFormData({
                 product_id: '',
                 quantity: '',
@@ -97,10 +98,9 @@ export default function WastePage() {
             });
             fetchWasteRecords();
             fetchSummary();
-            setTimeout(() => setMessage(''), 3000);
         } catch (error) {
             console.error('Error recording waste:', error);
-            setMessage('Error recording waste');
+            toast.error('Error recording waste');
         }
     };
 
@@ -165,11 +165,6 @@ export default function WastePage() {
                     <AlertCircle className="w-5 h-5 mr-2 text-red-600" />
                     Record Waste/Loss
                 </h2>
-                {message && (
-                    <div className={`p-4 mb-4 rounded ${message.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                        {message}
-                    </div>
-                )}
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Product</label>
@@ -177,6 +172,7 @@ export default function WastePage() {
                             value={formData.product_id}
                             onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
                             className="w-full mt-1 border p-2 rounded"
+                            autoFocus
                             required
                         >
                             <option value="">Select Product</option>
@@ -218,15 +214,18 @@ export default function WastePage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Cost Value</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                value={formData.cost_value}
-                                onChange={(e) => setFormData({ ...formData, cost_value: e.target.value })}
-                                className="w-full mt-1 border p-2 rounded bg-gray-50"
-                                required
-                                readOnly
-                            />
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.cost_value}
+                                    onChange={(e) => setFormData({ ...formData, cost_value: e.target.value })}
+                                    className="w-full mt-1 border p-2 pl-9 rounded bg-gray-50"
+                                    required
+                                    readOnly
+                                />
+                            </div>
                             <p className="text-xs text-gray-500 mt-1">Auto-calculated from product cost</p>
                         </div>
                         <div>

@@ -9,6 +9,7 @@ import customersRoutes from './routes/customers';
 import paymentsRoutes from './routes/payments';
 import arRoutes from './routes/accounts_receivable';
 import stockRoutes from './routes/stock';
+import usersRoutes from './routes/users'; // [NEW]
 import uploadRouter from './routes/upload'; // [NEW]
 import { supabase } from './supabase';
 import { startMcpServer } from './mcpServer'; // [NEW] Import MCP starter
@@ -79,6 +80,7 @@ app.use('/customers', customersRoutes);
 app.use('/payments', paymentsRoutes);
 app.use('/ar', arRoutes);
 app.use('/stock', stockRoutes);
+app.use('/users', usersRoutes); // [NEW]
 app.use('/upload', uploadRouter); // [NEW] Mount upload route
 
 

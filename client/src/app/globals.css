@@ -1,39 +1,111 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #000000;
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    /* Darker foreground for sharper text (Slate-950 equivalent) */
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* Dairy Blue - Adjusted to Blue-700 for better text contrast if used as text, 
+       but standard Blue-600 is sufficient for buttons. 
+       We keep Blue-600 (approx 53% L) which is ~4.6:1 on white.
+    */
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+
+    /* Emerald - Darkened slightly for better text legibility on white if needed. 
+       Emerald-600: 161.4 93.5% 30.4%
+    */
+    --secondary: 161.4 93.5% 30.4%;
+    --secondary-foreground: 355.7 100% 97.3%;
+
+    /* Muted Foreground - Darkened to Slate-600 equivalent for > 4.5:1 contrast 
+       Original was ~46% L, new is ~40% L
+    */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 40%;
+
+    --accent: 210 40% 96.1%;
+    /* Accent foreground darker for hover states */
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    /* Destructive - Red-600 for safe text usage */
+    --destructive: 0 72.2% 50.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 85%;
+    /* Slightly darker border for visibility */
+    --input: 214.3 31.8% 85%;
+    --ring: 221.2 83.2% 53.3%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 142.1 70.6% 45.3%;
+    --secondary-foreground: 144.9 80.4% 10%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 75%;
+    /* Lighter for dark mode */
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 25%;
+    --input: 217.2 32.6% 25%;
+    --ring: 224.3 76.3% 48%;
+  }
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-offset-2;
+    --tw-ring-color: hsl(var(--ring));
+  }
+
+  .skip-to-content {
+    @apply absolute -top-96 left-0 p-3 z-50 transition-all duration-200 focus:top-0;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
 }
 
-
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
+/* Animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
 
   to {
@@ -42,26 +114,6 @@ body {
   }
 }
 
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
 .animate-fade-in {
-  animation: fadeIn 0.5s ease-out;
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out backwards;
-}
-
-.animate-slide-in-left {
-  animation: slideInLeft 0.4s ease-out;
+  animation: fadeIn 0.3s ease-out forwards;
 }

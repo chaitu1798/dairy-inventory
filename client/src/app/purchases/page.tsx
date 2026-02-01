@@ -19,7 +19,7 @@ import Modal from '../../components/ui/Modal'; // Assuming we have this or use t
 // Schema Definition
 const purchaseSchema = z.object({
     product_id: z.string().min(1, 'Product is required'),
-    quantity: z.number().min(0.01, 'Quantity must be greater than 0'),
+    quantity: z.coerce.number().min(0.01, 'Quantity must be greater than 0'),
     purchase_date: z.string().min(1, 'Purchase date is required'),
     expiry_date: z.string().optional(),
     image_url: z.string().optional()
@@ -106,11 +106,13 @@ export default function PurchasesPage() {
     const fetchProducts = async () => {
         try {
             const res = await api.get('/products?limit=1000');
+            console.log('Fetched products:', res.data); // Debug log
             if (res.data && res.data.data) {
                 setProducts(res.data.data);
             } else if (Array.isArray(res.data)) {
                 setProducts(res.data);
             } else {
+                console.warn('Unexpected product response format:', res.data);
                 setProducts([]);
             }
         } catch (error) {
@@ -311,7 +313,7 @@ export default function PurchasesPage() {
                     />
                     <Button
                         onClick={() => fileInputRef.current?.click()}
-                        className="bg-purple-600 hover:bg-purple-700 text-white shadow-md"
+                        className="bg-sky-500 hover:bg-sky-600 text-white shadow-md"
                     >
                         <Camera className="w-5 h-5 mr-2" aria-hidden="true" />
                         Capture / Upload
@@ -385,7 +387,7 @@ export default function PurchasesPage() {
                                 <div className="flex gap-2 pt-2">
                                     <Button
                                         type="submit"
-                                        className="flex-1"
+                                        className="flex-1 bg-sky-500 hover:bg-sky-600"
                                         disabled={isSubmitting}
                                     >
                                         <Plus className="w-4 h-4 mr-2" />

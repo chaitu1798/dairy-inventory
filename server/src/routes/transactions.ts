@@ -42,6 +42,9 @@ router.get('/purchases', async (req, res) => {
 router.post('/purchases', requireAuth, async (req, res) => {
     const { product_id, quantity, purchase_date, expiry_date, image_url } = req.body;
 
+    // Sanitize dates
+    const finalExpiryDate = expiry_date === '' ? null : expiry_date;
+
     // Fetch product cost price
     const { data: product, error: productError } = await supabase
         .from('products')
@@ -57,7 +60,7 @@ router.post('/purchases', requireAuth, async (req, res) => {
 
     const { data, error } = await supabase
         .from('purchases')
-        .insert([{ product_id, quantity, price, purchase_date, expiry_date }])
+        .insert([{ product_id, quantity, price, purchase_date, expiry_date: finalExpiryDate }])
         .select();
 
     if (error) return res.status(400).json({ error: error.message });
@@ -142,6 +145,9 @@ router.get('/sales', async (req, res) => {
 router.post('/sales', requireAuth, async (req, res) => {
     const { product_id, quantity, sale_date, customer_id, status, due_date } = req.body;
 
+    // Sanitize dates
+    const finalDueDate = due_date === '' ? null : due_date;
+
     // Fetch product selling price
     const { data: product, error: productError } = await supabase
         .from('products')
@@ -167,7 +173,7 @@ router.post('/sales', requireAuth, async (req, res) => {
             sale_date,
             customer_id: customer_id || null,
             status: status || 'paid',
-            due_date: due_date || null,
+            due_date: finalDueDate || null,
             invoice_number
         }])
         .select();

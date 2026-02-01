@@ -88,6 +88,7 @@ api.interceptors.response.use(
             console.warn('Unauthorized access. Redirecting to login...');
             if (typeof window !== 'undefined') {
                 localStorage.removeItem('dairy_user');
+                localStorage.removeItem('dairy_login_timestamp');
                 window.location.href = '/login';
             }
         }

@@ -4,6 +4,7 @@ import './globals.css';
 import { Inter } from 'next/font/google';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import React from 'react';
 import { Analytics } from '@vercel/analytics/next';
@@ -50,12 +51,12 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile Header */}
         <header className="lg:hidden bg-background border-b px-4 h-16 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-lg">D</span>
             </div>
             <h1 className="text-lg font-bold tracking-tight">Dairy Manager</h1>
-          </div>
+          </Link>
           <Button
             variant="ghost"
             size="icon"

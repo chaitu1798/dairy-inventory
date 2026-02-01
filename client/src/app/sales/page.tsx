@@ -291,7 +291,7 @@ export default function SalesPage() {
                                 <div className="flex gap-2 pt-2">
                                     <Button
                                         type="submit"
-                                        className="flex-1"
+                                        className="flex-1 bg-sky-500 hover:bg-sky-600"
                                         disabled={isSubmitting}
                                     >
                                         <Plus className="w-4 h-4 mr-2" />

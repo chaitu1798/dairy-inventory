@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import api from '../../utils/api';
 import { useRouter } from 'next/navigation';
@@ -68,6 +68,18 @@ export default function LoginPage() {
         }
     };
 
+
+
+    useEffect(() => {
+        // Check for session expiry query param
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('reason') === 'session_expired') {
+            toast.error('Your session has expired. Please log in again.');
+            // Clean up the URL
+            window.history.replaceState({}, '', '/login');
+        }
+    }, []);
+
     return (
         <div className="flex items-center justify-center min-h-screen bg-muted/30 p-4">
             <Card className="w-full max-w-md shadow-lg border-2">
@@ -103,7 +115,7 @@ export default function LoginPage() {
                         />
                         <Button
                             type="submit"
-                            className="w-full"
+                            className="w-full bg-sky-500 hover:bg-sky-600"
                             size="lg"
                             disabled={isSubmitting}
                         >

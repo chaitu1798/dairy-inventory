@@ -51,12 +51,12 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 aria-label="Sidebar Navigation"
             >
                 <div className="p-6 flex justify-between items-center border-b border-slate-800">
-                    <div className="flex items-center gap-2">
+                    <Link href="/dashboard" className="flex items-center gap-2">
                         <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
                             <span className="text-primary-foreground font-bold text-lg">D</span>
                         </div>
                         <h1 className="text-xl font-bold tracking-tight">Dairy Manager</h1>
-                    </div>
+                    </Link>
                     <Button
                         variant="ghost"
                         size="icon"

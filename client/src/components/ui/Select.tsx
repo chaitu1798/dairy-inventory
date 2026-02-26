@@ -3,16 +3,16 @@ import { FieldError } from 'react-hook-form';
 import { cn } from '../../lib/utils';
 
 export interface SelectOption {
-    value: string;
-    label: string;
+    readonly value: string;
+    readonly label: string;
 }
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-    label: string;
-    options: SelectOption[];
-    error?: FieldError | undefined;
-    placeholder?: string;
-    helperText?: string;
+    readonly label: string;
+    readonly options: readonly SelectOption[];
+    readonly error?: FieldError;
+    readonly placeholder?: string;
+    readonly helperText?: string;
 }
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(

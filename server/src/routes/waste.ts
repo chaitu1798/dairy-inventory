@@ -15,7 +15,14 @@ router.post('/', requireAuth, async (req, res) => {
 
     const { data, error } = await supabase
         .from('waste')
-        .insert([{ product_id, quantity, reason, cost_value, waste_date, notes }])
+        .insert([{
+            product_id: parseInt(product_id as any),
+            quantity: parseFloat(quantity as any),
+            reason,
+            cost_value: parseFloat(cost_value as any),
+            waste_date,
+            notes
+        }])
         .select();
 
     if (error) return res.status(400).json({ error: error.message });
@@ -128,6 +135,43 @@ router.get('/summary', async (req, res) => {
         waste_by_reason: wasteByReason,
         waste_by_product: wasteByProduct
     });
+});
+
+// Update waste record
+router.put('/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const { product_id, quantity, reason, cost_value, waste_date, notes } = req.body;
+
+    // Create clean update object
+    const updates: any = {};
+    if (product_id !== undefined) updates.product_id = parseInt(product_id as any);
+    if (quantity !== undefined) updates.quantity = parseFloat(quantity as any);
+    if (reason !== undefined) {
+        if (!['expired', 'damaged', 'other'].includes(reason)) {
+            return res.status(400).json({ error: 'Invalid reason. Must be expired, damaged, or other' });
+        }
+        updates.reason = reason;
+    }
+    if (cost_value !== undefined) updates.cost_value = parseFloat(cost_value as any);
+    if (waste_date !== undefined) updates.waste_date = waste_date;
+    if (notes !== undefined) updates.notes = notes;
+
+    const { data, error } = await supabase
+        .from('waste')
+        .update(updates)
+        .eq('id', id)
+        .select();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
+});
+
+// Delete waste record
+router.delete('/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const { error } = await supabase.from('waste').delete().eq('id', id);
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ message: 'Waste record deleted' });
 });
 
 export default router;

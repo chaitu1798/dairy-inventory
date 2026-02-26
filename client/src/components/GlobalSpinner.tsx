@@ -16,12 +16,12 @@ export function GlobalSpinner() {
             setRequestCount(prev => Math.max(0, prev - 1));
         };
 
-        window.addEventListener('axios-request-start', handleRequestStart);
-        window.addEventListener('axios-request-end', handleRequestEnd);
+        globalThis.window?.addEventListener('axios-request-start', handleRequestStart);
+        globalThis.window?.addEventListener('axios-request-end', handleRequestEnd);
 
         return () => {
-            window.removeEventListener('axios-request-start', handleRequestStart);
-            window.removeEventListener('axios-request-end', handleRequestEnd);
+            globalThis.window?.removeEventListener('axios-request-start', handleRequestStart);
+            globalThis.window?.removeEventListener('axios-request-end', handleRequestEnd);
         };
     }, []);
 

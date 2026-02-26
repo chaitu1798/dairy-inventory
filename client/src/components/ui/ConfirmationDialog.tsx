@@ -3,15 +3,15 @@ import Modal from './Modal';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
 
 interface ConfirmationDialogProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onConfirm: () => void;
-    title: string;
-    description: string;
-    confirmText?: string;
-    cancelText?: string;
-    variant?: 'danger' | 'warning';
-    isLoading?: boolean;
+    readonly isOpen: boolean;
+    readonly onClose: () => void;
+    readonly onConfirm: () => void;
+    readonly title: string;
+    readonly description: string;
+    readonly confirmText?: string;
+    readonly cancelText?: string;
+    readonly variant?: 'danger' | 'warning';
+    readonly isLoading?: boolean;
 }
 
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({

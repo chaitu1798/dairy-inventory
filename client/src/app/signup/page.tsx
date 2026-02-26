@@ -38,9 +38,10 @@ export default function SignupPage() {
                 toast.success('Account created successfully! Please sign in.');
                 router.push('/login');
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Signup error:', err);
-            setServerError(err.response?.data?.error || 'Signup failed. Please try again.');
+            const errorMessage = err instanceof Error ? (err as any).response?.data?.error || err.message : 'Signup failed. Please try again.';
+            setServerError(errorMessage);
         }
     };
 

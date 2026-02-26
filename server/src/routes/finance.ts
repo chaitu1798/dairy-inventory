@@ -4,8 +4,46 @@ import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
+/**
+ * ACCOUNTS RECEIVABLE (AR)
+ */
+
+// Get AR stats
+router.get('/ar/stats', async (req, res) => {
+    const { data: sales, error } = await supabase
+        .from('sales')
+        .select('total, amount_paid, status')
+        .in('status', ['pending', 'overdue']);
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    let totalReceivable = 0;
+    let overdueAmount = 0;
+    let pendingAmount = 0;
+
+    sales.forEach(sale => {
+        const due = sale.total - (sale.amount_paid || 0);
+        totalReceivable += due;
+        if (sale.status === 'overdue') {
+            overdueAmount += due;
+        } else {
+            pendingAmount += due;
+        }
+    });
+
+    res.json({
+        totalReceivable,
+        overdueAmount,
+        pendingAmount
+    });
+});
+
+/**
+ * PAYMENTS
+ */
+
 // Get payments for a sale
-router.get('/:sale_id', async (req, res) => {
+router.get('/payments/:sale_id', async (req, res) => {
     const { sale_id } = req.params;
     const { data, error } = await supabase
         .from('payments')
@@ -18,20 +56,25 @@ router.get('/:sale_id', async (req, res) => {
 });
 
 // Record a payment
-router.post('/', requireAuth, async (req, res) => {
+router.post('/payments', requireAuth, async (req, res) => {
     const { sale_id, amount, payment_date, payment_method, notes } = req.body;
 
     // 1. Record payment
     const { data: payment, error: paymentError } = await supabase
         .from('payments')
-        .insert([{ sale_id, amount, payment_date, payment_method, notes }])
+        .insert([{
+            sale_id: parseInt(sale_id as any),
+            amount: parseFloat(amount as any),
+            payment_date,
+            payment_method,
+            notes
+        }])
         .select()
         .single();
 
     if (paymentError) return res.status(400).json({ error: paymentError.message });
 
     // 2. Update sale (amount_paid and status)
-    // First fetch current sale to calculate new totals
     const { data: sale, error: saleError } = await supabase
         .from('sales')
         .select('total, amount_paid')
@@ -40,8 +83,8 @@ router.post('/', requireAuth, async (req, res) => {
 
     if (saleError) return res.status(400).json({ error: 'Sale not found' });
 
-    const newAmountPaid = (sale.amount_paid || 0) + parseFloat(amount);
-    const newStatus = newAmountPaid >= sale.total ? 'paid' : 'pending'; // Or keep 'overdue' if date passed? Simplified logic for now.
+    const newAmountPaid = (sale.amount_paid || 0) + parseFloat(amount as any);
+    const newStatus = newAmountPaid >= sale.total ? 'paid' : 'pending';
 
     const { error: updateError } = await supabase
         .from('sales')

@@ -85,9 +85,9 @@ export default function CustomersPage() {
             setIsEditing(false);
             setEditId(null);
             fetchCustomers();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving customer:', error);
-            toast.error('Error saving customer');
+            toast.error(error.serverMessage || 'Error saving customer');
         }
     };
 
@@ -99,7 +99,7 @@ export default function CustomersPage() {
 
         setIsEditing(true);
         setEditId(customer.id);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        globalThis.window?.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleCancelEdit = () => {
@@ -136,7 +136,7 @@ export default function CustomersPage() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900" tabIndex={0}>Customers</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Customers</h1>
 
             {/* Form Section */}
             <Card>

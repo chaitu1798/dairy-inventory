@@ -35,9 +35,9 @@ export default function WastePage() {
     useEffect(() => {
         // Auto-calculate cost value when product and quantity change
         if (formData.product_id && formData.quantity) {
-            const product = products.find(p => p.id === parseInt(formData.product_id));
+            const product = products.find(p => p.id === Number.parseInt(formData.product_id, 10));
             if (product) {
-                const costValue = parseFloat(formData.quantity) * parseFloat(product.cost_price);
+                const costValue = Number.parseFloat(formData.quantity) * Number.parseFloat(product.cost_price);
                 setFormData(prev => ({ ...prev, cost_value: costValue.toFixed(2) }));
             }
         }
@@ -98,9 +98,9 @@ export default function WastePage() {
             });
             fetchWasteRecords();
             fetchSummary();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error recording waste:', error);
-            toast.error('Error recording waste');
+            toast.error(error.serverMessage || 'Error recording waste');
         }
     };
 

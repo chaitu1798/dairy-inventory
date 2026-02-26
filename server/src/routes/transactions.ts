@@ -86,7 +86,15 @@ router.post('/purchases', requireAuth, async (req, res) => {
 
 router.put('/purchases/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
-    const updates = req.body;
+    const { product_id, quantity, purchase_date, expiry_date } = req.body;
+
+    // Create clean update object
+    const updates: any = {};
+    if (product_id !== undefined) updates.product_id = parseInt(product_id as any);
+    if (quantity !== undefined) updates.quantity = parseFloat(quantity as any);
+    if (purchase_date !== undefined) updates.purchase_date = purchase_date;
+    if (expiry_date !== undefined) updates.expiry_date = expiry_date === '' ? null : expiry_date;
+
     const { data, error } = await supabase
         .from('purchases')
         .update(updates)
@@ -148,10 +156,10 @@ router.post('/sales', requireAuth, async (req, res) => {
     // Sanitize dates
     const finalDueDate = due_date === '' ? null : due_date;
 
-    // Fetch product selling price
+    // Fetch product price
     const { data: product, error: productError } = await supabase
         .from('products')
-        .select('selling_price')
+        .select('price')
         .eq('id', product_id)
         .single();
 
@@ -159,7 +167,7 @@ router.post('/sales', requireAuth, async (req, res) => {
         return res.status(400).json({ error: 'Product not found' });
     }
 
-    const price = product.selling_price;
+    const price = product.price;
 
     // Generate Invoice Number (Simple timestamp based for now, or random)
     const invoice_number = `INV-${Date.now()}`;
@@ -179,12 +187,38 @@ router.post('/sales', requireAuth, async (req, res) => {
         .select();
 
     if (error) return res.status(400).json({ error: error.message });
+
+    // Log to stock_logs
+    const { error: logError } = await supabase
+        .from('stock_logs')
+        .insert([{
+            product_id,
+            quantity: quantity,
+            action_type: 'OUT', // Sale is removing stock
+            updated_by: 'system'
+        }]);
+
+    if (logError) {
+        console.error('Error logging sales stock update:', logError);
+    }
+
     res.json(data);
 });
 
 router.put('/sales/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
-    const updates = req.body;
+    const { product_id, customer_id, quantity, price, sale_date, status, due_date } = req.body;
+
+    // Create clean update object
+    const updates: any = {};
+    if (product_id !== undefined) updates.product_id = parseInt(product_id as any);
+    if (customer_id !== undefined) updates.customer_id = customer_id ? parseInt(customer_id as any) : null;
+    if (quantity !== undefined) updates.quantity = parseFloat(quantity as any);
+    if (price !== undefined) updates.price = parseFloat(price as any);
+    if (sale_date !== undefined) updates.sale_date = sale_date;
+    if (status !== undefined) updates.status = status;
+    if (due_date !== undefined) updates.due_date = due_date === '' ? null : due_date;
+
     const { data, error } = await supabase
         .from('sales')
         .update(updates)
@@ -249,7 +283,15 @@ router.post('/expenses', requireAuth, async (req, res) => {
 
 router.put('/expenses/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
-    const updates = req.body;
+    const { category, amount, notes, expense_date } = req.body;
+
+    // Create clean update object
+    const updates: any = {};
+    if (category !== undefined) updates.category = category;
+    if (amount !== undefined) updates.amount = amount;
+    if (notes !== undefined) updates.notes = notes;
+    if (expense_date !== undefined) updates.expense_date = expense_date;
+
     const { data, error } = await supabase
         .from('expenses')
         .update(updates)

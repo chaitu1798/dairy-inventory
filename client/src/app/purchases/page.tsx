@@ -92,7 +92,7 @@ export default function PurchasesPage() {
             if (product?.track_expiry && product?.expiry_days && watchedPurchaseDate) {
                 const purchaseDate = new Date(watchedPurchaseDate);
                 const expiryDate = new Date(purchaseDate);
-                expiryDate.setDate(expiryDate.getDate() + parseInt(product.expiry_days));
+                expiryDate.setDate(expiryDate.getDate() + Number.parseInt(product.expiry_days, 10));
                 setValue('expiry_date', expiryDate.toISOString().split('T')[0]);
             } else if (!product?.track_expiry) {
                 setValue('expiry_date', '');
@@ -162,9 +162,9 @@ export default function PurchasesPage() {
             setIsEditing(false);
             setEditId(null);
             fetchPurchases();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error recording purchase:', error);
-            toast.error('Error recording purchase');
+            toast.error(error.serverMessage || 'Error recording purchase');
         }
     };
 
@@ -177,7 +177,7 @@ export default function PurchasesPage() {
 
         setIsEditing(true);
         setEditId(purchase.id);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        globalThis.window?.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleCancelEdit = () => {
@@ -300,7 +300,7 @@ export default function PurchasesPage() {
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900" tabIndex={0}>Purchases</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Purchases</h1>
                 <div>
                     <input
                         type="file"

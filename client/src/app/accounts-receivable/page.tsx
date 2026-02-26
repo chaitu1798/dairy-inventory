@@ -24,7 +24,7 @@ export default function AccountsReceivablePage() {
 
     const fetchStats = async () => {
         try {
-            const res = await api.get('/ar/stats');
+            const res = await api.get('/finance/ar/stats');
             setStats(res.data);
         } catch (error) {
             console.error('Error fetching AR stats:', error);
@@ -65,9 +65,9 @@ export default function AccountsReceivablePage() {
         if (!selectedInvoice) return;
 
         try {
-            await api.post('/payments', {
+            await api.post('/finance/payments', {
                 sale_id: selectedInvoice.id,
-                amount: parseFloat(paymentAmount),
+                amount: Number.parseFloat(paymentAmount),
                 payment_date: new Date().toISOString().split('T')[0],
                 payment_method: paymentMethod,
                 notes: 'Payment recorded via AR Dashboard'
@@ -77,13 +77,11 @@ export default function AccountsReceivablePage() {
             setSelectedInvoice(null);
             setPaymentAmount('');
             fetchStats();
-            setPaymentAmount('');
-            fetchStats();
             fetchInvoices();
             toast.success('Payment recorded successfully!');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error recording payment:', error);
-            toast.error('Failed to record payment');
+            toast.error(error.serverMessage || 'Failed to record payment');
         }
     };
 

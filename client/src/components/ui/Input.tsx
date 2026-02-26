@@ -3,10 +3,10 @@ import { FieldError } from 'react-hook-form';
 import { cn } from '../../lib/utils';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-    label: string;
-    error?: FieldError | undefined;
-    helperText?: string;
-    startAdornment?: React.ReactNode;
+    readonly label: string;
+    readonly error?: FieldError;
+    readonly helperText?: string;
+    readonly startAdornment?: React.ReactNode;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(

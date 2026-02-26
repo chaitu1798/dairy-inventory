@@ -6,28 +6,28 @@ const router = Router();
 // Dashboard endpoint - comprehensive dashboard data
 router.get('/dashboard', async (req, res) => {
     try {
-        // Get today's stats
         const targetDate = new Date().toISOString().split('T')[0];
 
-        const { data: sales, error: salesError } = await supabase
-            .from('sales')
-            .select('total')
-            .eq('sale_date', targetDate);
-
-        const { data: purchases, error: purchasesError } = await supabase
-            .from('purchases')
-            .select('total')
-            .eq('purchase_date', targetDate);
-
-        const { data: expenses, error: expensesError } = await supabase
-            .from('expenses')
-            .select('amount')
-            .eq('expense_date', targetDate);
-
-        const { data: waste, error: wasteError } = await supabase
-            .from('waste')
-            .select('cost_value')
-            .eq('waste_date', targetDate);
+        // Run all queries in parallel for performance
+        const [
+            { data: sales, error: salesError },
+            { data: purchases, error: purchasesError },
+            { data: expenses, error: expensesError },
+            { data: waste, error: wasteError },
+            { data: inventory },
+            { data: lowStock },
+            { data: expiringItems },
+            { data: topSelling }
+        ] = await Promise.all([
+            supabase.from('sales').select('total').eq('sale_date', targetDate),
+            supabase.from('purchases').select('total').eq('purchase_date', targetDate),
+            supabase.from('expenses').select('amount').eq('expense_date', targetDate),
+            supabase.from('waste').select('cost_value').eq('waste_date', targetDate),
+            supabase.from('inventory').select('stock_value'),
+            supabase.from('low_stock_items').select('id'),
+            supabase.from('expiring_items').select('id'),
+            supabase.from('top_selling_products').select('*').limit(5)
+        ]);
 
         if (salesError || purchasesError || expensesError || wasteError) {
             return res.status(400).json({ error: 'Error fetching dashboard data' });
@@ -37,33 +37,7 @@ router.get('/dashboard', async (req, res) => {
         const totalPurchases = purchases?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
         const totalExpenses = expenses?.reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
         const totalWaste = waste?.reduce((acc, curr) => acc + (curr.cost_value || 0), 0) || 0;
-
-        // Get total stock value
-        const { data: inventory, error: invError } = await supabase
-            .from('inventory')
-            .select('stock_value');
-
         const totalStockValue = inventory?.reduce((acc, curr) => acc + (curr.stock_value || 0), 0) || 0;
-
-        // Get low stock count
-        const { data: lowStock, error: lowStockError } = await supabase
-            .from('low_stock_items')
-            .select('id');
-
-        const lowStockCount = lowStock?.length || 0;
-
-        // Get expiring items count
-        const { data: expiringItems, error: expiringError } = await supabase
-            .from('expiring_items')
-            .select('id');
-
-        const expiringCount = expiringItems?.length || 0;
-
-        // Get top selling products (top 5)
-        const { data: topSelling, error: topSellingError } = await supabase
-            .from('top_selling_products')
-            .select('*')
-            .limit(5);
 
         res.json({
             today: {
@@ -74,8 +48,8 @@ router.get('/dashboard', async (req, res) => {
                 net: totalSales - totalPurchases - totalExpenses - totalWaste
             },
             total_stock_value: totalStockValue,
-            low_stock_count: lowStockCount,
-            expiring_count: expiringCount,
+            low_stock_count: lowStock?.length || 0,
+            expiring_count: expiringItems?.length || 0,
             top_selling_products: topSelling || []
         });
     } catch (error: any) {
@@ -137,7 +111,7 @@ router.get('/daily/details', async (req, res) => {
         // 1. Fetch all products
         const { data: products, error: prodError } = await supabase
             .from('products')
-            .select('id, name, cost_price, selling_price');
+            .select('id, name, cost_price, price');
 
         if (prodError) throw prodError;
 

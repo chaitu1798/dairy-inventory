@@ -6,13 +6,10 @@ import transactionRoutes from './routes/transactions';
 import reportRoutes from './routes/reports';
 import wasteRoutes from './routes/waste';
 import customersRoutes from './routes/customers';
-import paymentsRoutes from './routes/payments';
-import arRoutes from './routes/accounts_receivable';
+import financeRoutes from './routes/finance';
 import stockRoutes from './routes/stock';
-import usersRoutes from './routes/users'; // [NEW]
-import uploadRouter from './routes/upload'; // [NEW]
+import uploadRouter from './routes/upload';
 import { supabase } from './supabase';
-import { startMcpServer } from './mcpServer'; // [NEW] Import MCP starter
 
 import dotenv from 'dotenv';
 
@@ -25,6 +22,7 @@ const port = process.env.PORT || 3001;
 
 app.use(compression()); // [NEW] Compress all routes
 app.use(express.json());
+
 
 // Configure CORS to allow frontend domains
 const allowedOrigins = [
@@ -77,10 +75,8 @@ app.use('/', transactionRoutes); // /purchases, /sales, /expenses
 app.use('/reports', reportRoutes);
 app.use('/waste', wasteRoutes);
 app.use('/customers', customersRoutes);
-app.use('/payments', paymentsRoutes);
-app.use('/ar', arRoutes);
+app.use('/finance', financeRoutes);
 app.use('/stock', stockRoutes);
-app.use('/users', usersRoutes); // [NEW]
 app.use('/upload', uploadRouter); // [NEW] Mount upload route
 
 

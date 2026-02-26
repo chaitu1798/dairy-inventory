@@ -50,7 +50,7 @@ export default function MonthlyReportPage() {
                 <div className="flex space-x-4">
                     <select
                         value={month}
-                        onChange={(e) => setMonth(parseInt(e.target.value))}
+                        onChange={(e) => setMonth(Number.parseInt(e.target.value, 10))}
                         className="border p-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                         {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -61,7 +61,7 @@ export default function MonthlyReportPage() {
                     </select>
                     <select
                         value={year}
-                        onChange={(e) => setYear(parseInt(e.target.value))}
+                        onChange={(e) => setYear(Number.parseInt(e.target.value, 10))}
                         className="border p-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                         {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (

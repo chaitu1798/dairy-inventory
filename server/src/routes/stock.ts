@@ -1,31 +1,22 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
 import { requireAuth } from '../middleware/auth';
-import multer from 'multer';
+import { upload } from '../imageUtils'; // Shared multer instance
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
-// Upload image to Supabase Storage
 router.post('/upload', requireAuth, upload.single('image'), async (req, res) => {
-    console.log('--- [POST] /stock/upload request received ---');
     try {
         if (!req.file) {
-            console.error('Error: No image file provided');
             return res.status(400).json({ error: 'No image file provided' });
         }
 
         const file = req.file;
-        console.log(`File received: ${file.originalname}, Size: ${file.size}, Mime: ${file.mimetype}`);
-
-        // Sanitize filename
         const fileExt = file.originalname.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${fileName}`; // Could add folder like 'uploads/${fileName}' if needed
+        const filePath = `${fileName}`;
 
-        console.log(`Uploading to bucket 'product-images' as '${filePath}'...`);
-
-        // Use shared supabase client
         const { data, error } = await supabase
             .storage
             .from('product-images')
@@ -35,58 +26,40 @@ router.post('/upload', requireAuth, upload.single('image'), async (req, res) => 
             });
 
         if (error) {
-            console.error('Supabase upload error:', JSON.stringify(error, null, 2));
-            // Check for specific error types if needed (e.g. bucket not found)
+            console.error('Supabase upload error:', error.message);
             return res.status(500).json({
                 error: 'Failed to upload image',
-                details: error.message || 'Unknown Supabase error'
+                details: error.message
             });
         }
 
-        console.log('Upload successful. Fetching Public URL...');
         const { data: { publicUrl } } = supabase
             .storage
             .from('product-images')
             .getPublicUrl(filePath);
 
-        console.log('Public URL:', publicUrl);
-        console.log('--- [POST] /stock/upload completed ---');
-
-        // Return both URL and filePath
         res.json({ url: publicUrl, filePath });
     } catch (error) {
-        console.error('CRITICAL Upload error:', error);
+        console.error('Upload error:', error instanceof Error ? error.message : error);
         res.status(500).json({
             error: 'Internal server error during upload',
             details: error instanceof Error ? error.message : String(error)
         });
-        return;
     }
 });
 
-// Analyze image using Gemini 1.5 Flash
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
 router.post('/analyze', requireAuth, async (req, res) => {
-    console.log('--- [POST] /stock/analyze request received ---');
     const { imageUrl, filePath } = req.body;
-    console.log('Params:', { imageUrl, filePath });
 
     if (!imageUrl && !filePath) {
-        console.error('Error: Missing imageUrl and filePath');
         return res.status(400).json({ error: 'Image URL or File Path is required' });
     }
 
     try {
         const key = process.env.GEMINI_API_KEY;
-        if (!key) {
-            console.error('Error: GEMINI_API_KEY missing');
-            throw new Error('GEMINI_API_KEY is not set');
-        }
+        if (!key) throw new Error('GEMINI_API_KEY is not set');
 
-        console.log('Initializing Gemini 1.5-flash...');
         const genAI = new GoogleGenerativeAI(key);
-        // Using gemini-1.5-flash for stability
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         let imageBuffer: ArrayBuffer;
@@ -94,49 +67,34 @@ router.post('/analyze', requireAuth, async (req, res) => {
 
         // Method 1: Download from Supabase
         if (filePath) {
-            console.log('Downloading image from Supabase Storage:', filePath);
             const { data, error } = await supabase.storage.from('product-images').download(filePath);
 
             if (!error && data) {
                 imageBuffer = await data.arrayBuffer();
                 mimeType = data.type || mimeType;
-                console.log('Image downloadable, size:', imageBuffer.byteLength, 'type:', mimeType);
             } else {
-                console.warn('Supabase download failed, attempting Signed URL. Error:', error?.message);
-
-                // Try Signed URL (Works for private buckets if we have permission)
-                const { data: signedData, error: signedError } = await supabase
+                const { data: signedData } = await supabase
                     .storage
                     .from('product-images')
                     .createSignedUrl(filePath, 60);
 
                 if (signedData?.signedUrl) {
-                    console.log('Fetching from Signed URL...');
                     const signedResp = await fetch(signedData.signedUrl);
                     if (signedResp.ok) {
                         imageBuffer = await signedResp.arrayBuffer();
                         mimeType = signedResp.headers.get('content-type') || mimeType;
-                        console.log('Image fetched from Signed URL, size:', imageBuffer.byteLength);
-                    } else {
-                        console.error('Failed to fetch Signed URL:', signedResp.statusText);
                     }
-                } else {
-                    console.error('Failed to create Signed URL:', signedError?.message);
                 }
             }
         }
 
-        // Method 2: Fetch from URL (Last resort - for Public buckets)
         if (!imageBuffer! && imageUrl) {
-            console.log('Fetching image from Public URL:', imageUrl);
             const imageResp = await fetch(imageUrl);
-            if (!imageResp.ok) {
-                // Don't throw yet, we might have failed everywhere
-                console.error(`Failed to fetch image from URL: ${imageResp.statusText}`);
-            } else {
+            if (imageResp.ok) {
                 imageBuffer = await imageResp.arrayBuffer();
                 mimeType = imageResp.headers.get('content-type') || mimeType;
-                console.log('Image fetched from Public URL, size:', imageBuffer.byteLength);
+            } else {
+                console.error(`Failed to fetch image from URL: ${imageResp.statusText}`);
             }
         }
 
@@ -154,7 +112,6 @@ router.post('/analyze', requireAuth, async (req, res) => {
         
         Return ONLY the JSON object, no markdown formatting.`;
 
-        console.log('Sending to Gemini...');
         const result = await model.generateContent([
             prompt,
             {
@@ -167,24 +124,20 @@ router.post('/analyze', requireAuth, async (req, res) => {
 
         const response = await result.response;
         const text = response.text();
-        console.log('Gemini response received:', text);
 
-        // Clean up markdown code blocks if present
         const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
         try {
             const data = JSON.parse(jsonStr);
-            console.log('Parsed JSON:', data);
             res.json(data);
         } catch (parseError) {
-            console.error('JSON Parse Error:', parseError);
-            console.error('Raw Gemini Text:', text);
+            console.error('Failed to parse Gemini response. Raw text:', text);
             throw new Error('Failed to parse Gemini response as JSON');
         }
 
     } catch (error: any) {
-        console.error('CRITICAL Gemini analysis error details:', JSON.stringify(error, null, 2));
-        res.status(500).json({ error: 'Failed to analyze image', details: error.message, fullError: error });
+        console.error('Gemini analysis error:', error.message);
+        res.status(500).json({ error: 'Failed to analyze image', details: error.message });
     }
 });
 

@@ -72,11 +72,11 @@ export default function LoginPage() {
 
     useEffect(() => {
         // Check for session expiry query param
-        const params = new URLSearchParams(window.location.search);
+        const params = new URLSearchParams(globalThis.window?.location.search);
         if (params.get('reason') === 'session_expired') {
             toast.error('Your session has expired. Please log in again.');
             // Clean up the URL
-            window.history.replaceState({}, '', '/login');
+            globalThis.window?.history.replaceState({}, '', '/login');
         }
     }, []);
 

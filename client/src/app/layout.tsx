@@ -16,7 +16,7 @@ import { GlobalSpinner } from '../components/GlobalSpinner';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
-function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+function AuthenticatedLayout({ children }: { readonly children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
@@ -78,7 +78,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) {
   return (
     <html lang="en">

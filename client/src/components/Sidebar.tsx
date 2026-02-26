@@ -8,8 +8,8 @@ import { cn } from '../lib/utils';
 import { Button } from './ui/Button';
 
 interface SidebarProps {
-    isOpen: boolean;
-    onClose: () => void;
+    readonly isOpen: boolean;
+    readonly onClose: () => void;
 }
 
 const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
@@ -27,7 +27,6 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         { href: '/waste', label: 'Waste', icon: Trash2 },
         { href: '/reports/daily', label: 'Daily Report', icon: FileBarChart },
         { href: '/reports/monthly', label: 'Monthly Report', icon: FileBarChart },
-        { href: '/admin/users', label: 'User Management', icon: UserCog },
     ];
 
     return (
@@ -98,7 +97,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
                 <div className="p-4 border-t border-slate-800 lg:pb-4 pb-8">
                     <button
-                        onClick={logout}
+                        onClick={() => logout()}
                         className="flex items-center w-full px-4 py-3.5 text-sm font-medium text-slate-400 hover:bg-destructive/10 hover:text-destructive rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive group"
                         aria-label="Logout"
                     >

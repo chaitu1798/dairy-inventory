@@ -164,9 +164,9 @@ export default function ProductsPage() {
             setIsEditing(false);
             setEditId(null);
             fetchProducts(currentPage);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving product:', error);
-            toast.error('Failed to save product');
+            toast.error(error.serverMessage || 'Failed to save product');
         }
     };
 
@@ -182,7 +182,7 @@ export default function ProductsPage() {
             track_expiry: product.track_expiry || false,
             expiry_date: product.expiry_date ? product.expiry_date.split('T')[0] : ''
         });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        globalThis.window?.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleDeleteClick = (id: number) => {
@@ -311,7 +311,7 @@ export default function ProductsPage() {
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900" tabIndex={0}>Products Inventory</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Products Inventory</h1>
                 <div className="flex gap-2 w-full md:w-auto">
                     {/* Placeholder for future action buttons */}
                 </div>

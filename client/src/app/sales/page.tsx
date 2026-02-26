@@ -157,9 +157,9 @@ export default function SalesPage() {
             setIsEditing(false);
             setEditId(null);
             fetchSales();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error recording sale:', error);
-            toast.error('Error recording sale');
+            toast.error(error.serverMessage || 'Error recording sale');
         }
     };
 
@@ -174,7 +174,7 @@ export default function SalesPage() {
             status: sale.status || 'paid',
             due_date: sale.due_date ? sale.due_date.split('T')[0] : ''
         });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        globalThis.window?.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleCancelEdit = () => {
@@ -213,7 +213,7 @@ export default function SalesPage() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900" tabIndex={0}>Sales Management</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sales Management</h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Form Section */}

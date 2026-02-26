@@ -1,11 +1,48 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../../utils/api';
 import { DollarSign, ShoppingCart, TrendingUp, Package, AlertTriangle, Clock, TrendingDown, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import Input from '../../components/ui/Input';
 import Tooltip from '../../components/ui/Tooltip'; // [NEW]
 import { Button } from '../../components/ui/Button';
+
+interface StatCardProps {
+    readonly title: string;
+    readonly value: number | string;
+    readonly icon: React.ElementType;
+    readonly color: string;
+    readonly suffix?: string;
+    readonly tooltip?: string;
+}
+
+const StatCard = ({ title, value, icon: Icon, color, suffix = '', tooltip }: StatCardProps) => (
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between">
+            <div>
+                <div className="flex items-center mb-1">
+                    <p className="text-gray-500 text-sm font-medium uppercase tracking-wider mr-2">{title}</p>
+                    {tooltip && <Tooltip content={tooltip} />}
+                </div>
+                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{suffix}{typeof value === 'number' ? value.toFixed(2) : value || '0'}</h3>
+            </div>
+            <div className={`p-4 rounded-xl ${color}`}>
+                <Icon className="w-6 h-6" />
+            </div>
+        </div>
+    </div>
+);
+
+interface SortIconProps {
+    readonly field: string;
+    readonly sortBy: string;
+    readonly sortOrder: 'asc' | 'desc';
+}
+
+const SortIcon = ({ field, sortBy, sortOrder }: SortIconProps) => {
+    if (sortBy !== field) return <ArrowUpDown className="w-4 h-4 ml-1 text-gray-400 opacity-50" />;
+    return sortOrder === 'asc' ? <ArrowUp className="w-4 h-4 ml-1 text-primary" /> : <ArrowDown className="w-4 h-4 ml-1 text-primary" />;
+};
 
 export default function Dashboard() {
     const [dashboardData, setDashboardData] = useState<any>(null);
@@ -23,7 +60,6 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchDashboardData();
-        fetchInventory();
         fetchExpiringItems();
         fetchLowStockItems();
     }, []);
@@ -72,11 +108,6 @@ export default function Dashboard() {
         }
     };
 
-    const SortIcon = ({ field }: { field: string }) => {
-        if (sortBy !== field) return <ArrowUpDown className="w-4 h-4 ml-1 text-gray-400 opacity-50" />;
-        return sortOrder === 'asc' ? <ArrowUp className="w-4 h-4 ml-1 text-primary" /> : <ArrowDown className="w-4 h-4 ml-1 text-primary" />;
-    };
-
     const fetchExpiringItems = async () => {
         try {
             const res = await api.get('/reports/expiring');
@@ -94,23 +125,6 @@ export default function Dashboard() {
             console.error('Error fetching low stock items:', error);
         }
     };
-
-    const StatCard = ({ title, value, icon: Icon, color, suffix = '', tooltip }: any) => (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-                <div>
-                    <div className="flex items-center mb-1">
-                        <p className="text-gray-500 text-sm font-medium uppercase tracking-wider mr-2">{title}</p>
-                        {tooltip && <Tooltip content={tooltip} />}
-                    </div>
-                    <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{suffix}{typeof value === 'number' ? value.toFixed(2) : value || '0'}</h3>
-                </div>
-                <div className={`p-4 rounded-xl ${color}`}>
-                    <Icon className="w-6 h-6" />
-                </div>
-            </div>
-        </div>
-    );
 
     return (
         <div className="space-y-12 max-w-7xl mx-auto">
@@ -227,8 +241,8 @@ export default function Dashboard() {
                                 <span className="bg-red-100 text-red-800 text-xs font-bold px-2.5 py-0.5 rounded-full">{expiringItems.length} items</span>
                             </div>
                             <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
-                                {expiringItems.map((item, idx) => (
-                                    <div key={idx} className="p-4 hover:bg-red-50/30 transition-colors">
+                                {expiringItems.map((item) => (
+                                    <div key={item.id || `${item.name}-${item.expiry_date}`} className="p-4 hover:bg-red-50/30 transition-colors">
                                         <div className="flex justify-between items-center mb-1">
                                             <p className="font-semibold text-gray-900">{item.name}</p>
                                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
@@ -259,7 +273,7 @@ export default function Dashboard() {
                     <div className="p-8">
                         <div className="space-y-6">
                             {dashboardData.top_selling_products.map((product: any, idx: number) => (
-                                <div key={product.id} className="flex items-center justify-between">
+                                <div key={product.id || idx} className="flex items-center justify-between">
                                     <div className="flex items-center space-x-6">
                                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-50 text-green-600 font-bold text-sm">
                                             {idx + 1}
@@ -310,7 +324,7 @@ export default function Dashboard() {
                                 <div className="text-right">
                                     {item.is_low_stock ? (
                                         <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 flex items-center">
-                                            <AlertTriangle className="w-3 h-3 mr-1" />
+                                            <AlertTriangle className="w-3 h-3 mr-1" aria-hidden="true" />
                                             Low
                                         </span>
                                     ) : (
@@ -347,25 +361,25 @@ export default function Dashboard() {
                                     className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-900 transition-colors"
                                     onClick={() => handleSort('name')}
                                 >
-                                    <div className="flex items-center">Product <SortIcon field="name" /></div>
+                                    <div className="flex items-center">Product <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} /></div>
                                 </th>
                                 <th
                                     className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-900 transition-colors"
                                     onClick={() => handleSort('category')}
                                 >
-                                    <div className="flex items-center">Category <SortIcon field="category" /></div>
+                                    <div className="flex items-center">Category <SortIcon field="category" sortBy={sortBy} sortOrder={sortOrder} /></div>
                                 </th>
                                 <th
                                     className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-900 transition-colors"
                                     onClick={() => handleSort('current_stock')}
                                 >
-                                    <div className="flex items-center">Stock <SortIcon field="current_stock" /></div>
+                                    <div className="flex items-center">Stock <SortIcon field="current_stock" sortBy={sortBy} sortOrder={sortOrder} /></div>
                                 </th>
                                 <th
                                     className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-900 transition-colors"
                                     onClick={() => handleSort('stock_value')}
                                 >
-                                    <div className="flex items-center">Stock Value <SortIcon field="stock_value" /></div>
+                                    <div className="flex items-center">Stock Value <SortIcon field="stock_value" sortBy={sortBy} sortOrder={sortOrder} /></div>
                                 </th>
                                 <th className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                             </tr>

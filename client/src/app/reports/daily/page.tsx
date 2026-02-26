@@ -69,13 +69,13 @@ export default function DailyReportPage() {
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
+            const url = globalThis.window?.URL.createObjectURL(blob);
+            link.setAttribute("href", url || '');
             link.setAttribute("download", `Daily_Report_${date}.csv`);
             link.style.visibility = 'hidden';
-            document.body.appendChild(link);
+            globalThis.document?.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
+            globalThis.document?.body.removeChild(link);
         } catch (error) {
             console.error('Error downloading report:', error);
             alert('Failed to download report');

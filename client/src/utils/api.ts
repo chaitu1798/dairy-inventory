@@ -4,14 +4,16 @@ import axios from 'axios';
 let baseURL = process.env.NEXT_PUBLIC_API_URL;
 
 // If running in browser on localhost and no env var is set, default to port 3001
-if (!baseURL && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+if (!baseURL && typeof globalThis.window !== 'undefined' && globalThis.window.location.hostname === 'localhost') {
     baseURL = 'http://localhost:3001';
 }
 
 // Final fallback
 baseURL = baseURL || 'http://localhost:3001';
 
-console.log('API Base URL:', baseURL);
+if (process.env.NODE_ENV === 'development') {
+    console.log('API Base URL:', baseURL);
+}
 
 const api = axios.create({
     baseURL
@@ -28,14 +30,16 @@ if (api.defaults.baseURL?.endsWith('/api/')) {
 // Request interceptor to add Auth token
 api.interceptors.request.use(request => {
     // Dispatch event to show global spinner
-    if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('axios-request-start'));
+    if (typeof globalThis.window !== 'undefined') {
+        globalThis.window.dispatchEvent(new Event('axios-request-start'));
     }
 
-    console.log('[API Request]:', request.method?.toUpperCase(), request.url, 'Base:', request.baseURL);
+    if (process.env.NODE_ENV === 'development') {
+        console.log('[API Request]:', request.method?.toUpperCase(), request.url);
+    }
 
     // Add Authorization header if user is logged in
-    if (typeof window !== 'undefined') {
+    if (typeof globalThis.window !== 'undefined') {
         try {
             const userStr = localStorage.getItem('dairy_user');
             if (userStr) {
@@ -65,8 +69,8 @@ api.interceptors.request.use(request => {
 
     return request;
 }, error => {
-    if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('axios-request-end'));
+    if (typeof globalThis.window !== 'undefined') {
+        globalThis.window.dispatchEvent(new Event('axios-request-end'));
     }
     return Promise.reject(error);
 });
@@ -74,24 +78,31 @@ api.interceptors.request.use(request => {
 // Response interceptor to handle authentication errors
 api.interceptors.response.use(
     (response) => {
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new Event('axios-request-end'));
+        if (typeof globalThis.window !== 'undefined') {
+            globalThis.window.dispatchEvent(new Event('axios-request-end'));
         }
         return response;
     },
     (error) => {
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new Event('axios-request-end'));
+        if (typeof globalThis.window !== 'undefined') {
+            globalThis.window.dispatchEvent(new Event('axios-request-end'));
         }
 
         if (error.response && error.response.status === 401) {
             console.warn('Unauthorized access. Redirecting to login...');
-            if (typeof window !== 'undefined') {
+            if (typeof globalThis.window !== 'undefined') {
                 localStorage.removeItem('dairy_user');
                 localStorage.removeItem('dairy_login_timestamp');
-                window.location.href = '/login';
+                globalThis.window.location.href = '/login';
             }
         }
+
+        // Extract server error message if available
+        const serverMessage = error.response?.data?.error || error.response?.data?.message;
+        if (serverMessage) {
+            error.serverMessage = serverMessage;
+        }
+
         return Promise.reject(error);
     }
 );

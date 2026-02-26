@@ -99,9 +99,9 @@ export default function ExpensesPage() {
             setIsEditing(false);
             setEditId(null);
             fetchExpenses();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error recording expense:', error);
-            toast.error('Error recording expense');
+            toast.error(error.serverMessage || 'Error recording expense');
         }
     };
 
@@ -113,7 +113,7 @@ export default function ExpensesPage() {
 
         setIsEditing(true);
         setEditId(expense.id);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        globalThis.window?.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleCancelEdit = () => {
@@ -149,7 +149,7 @@ export default function ExpensesPage() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900" tabIndex={0}>Expenses</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Expenses</h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Form Section */}

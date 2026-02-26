@@ -30,7 +30,15 @@ router.post('/', requireAuth, async (req, res) => {
 // Update customer
 router.put('/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
-    const updates = req.body;
+    const { name, phone, email, address, credit_limit } = req.body;
+
+    const updates: any = {};
+    if (name !== undefined) updates.name = name;
+    if (phone !== undefined) updates.phone = phone;
+    if (email !== undefined) updates.email = email;
+    if (address !== undefined) updates.address = address;
+    if (credit_limit !== undefined) updates.credit_limit = parseFloat(credit_limit as any);
+
     const { data, error } = await supabase
         .from('customers')
         .update(updates)

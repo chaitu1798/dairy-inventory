@@ -1,8 +1,5 @@
-
 import { Router } from 'express';
-import { upload } from '../imageUpload';
-import { analyzeImage } from '../analyzeImage';
-import { updateStockFromImage } from '../imageTool';
+import { upload, analyzeImage, updateStockFromImage } from '../imageUtils';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();

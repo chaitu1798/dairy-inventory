@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
         setUser(userData);
         localStorage.setItem('dairy_user', JSON.stringify(userData));
         localStorage.setItem('dairy_login_timestamp', Date.now().toString());
-        router.push('/dashboard');
+        globalThis.window.location.href = '/dashboard';
     }, [router]);
 
     const contextValue = useMemo(() => ({

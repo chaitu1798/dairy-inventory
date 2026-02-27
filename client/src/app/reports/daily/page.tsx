@@ -4,9 +4,30 @@ import { useState, useEffect } from 'react';
 import api from '../../../utils/api';
 import { TrendingUp, ShoppingCart, DollarSign, Package, Download, Trash2 } from 'lucide-react';
 
+interface DailyRecord {
+    date: string;
+    product_name: string;
+    opening_stock: number;
+    purchases_qty: number;
+    sales_qty: number;
+    closing_stock: number;
+    total_purchase_value: number;
+    total_sales_value: number;
+    gross_profit: number;
+    notes?: string;
+}
+
+interface DailyStats {
+    total_sales: number;
+    total_purchases: number;
+    total_expenses: number;
+    total_waste: number;
+    profit: number;
+}
+
 export default function DailyReportPage() {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [stats, setStats] = useState<any>(null);
+    const [stats, setStats] = useState<DailyStats | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -19,7 +40,7 @@ export default function DailyReportPage() {
             const res = await api.get(`/reports/daily?date=${date}`);
             setStats(res.data);
         } catch (error) {
-            console.error('Error fetching stats:', error);
+            console.warn('Error fetching stats:', error);
         } finally {
             setLoading(false);
         }
@@ -32,7 +53,7 @@ export default function DailyReportPage() {
 
             const header = ['Date', 'Product Name', 'Opening Stock', 'Purchases (Qty)', 'Sales (Qty)', 'Closing Stock', 'Total Purchase Value', 'Total Sales Value', 'Gross Profit', 'Net Profit (after expenses)', 'Notes'];
 
-            const rows = records.map((r: any) => [
+            const rows = records.map((r: DailyRecord) => [
                 r.date,
                 r.product_name,
                 r.opening_stock,
@@ -63,7 +84,7 @@ export default function DailyReportPage() {
 
             const csvContent = [
                 header.join(','),
-                ...rows.map((r: any[]) => r.join(',')),
+                ...rows.map((r: (string | number)[]) => r.join(',')),
                 totalRow.join(',')
             ].join('\n');
 
@@ -77,12 +98,12 @@ export default function DailyReportPage() {
             link.click();
             globalThis.document?.body.removeChild(link);
         } catch (error) {
-            console.error('Error downloading report:', error);
+            console.warn('Error downloading report:', error);
             alert('Failed to download report');
         }
     };
 
-    const StatCard = ({ title, value, icon: Icon, gradient, delay }: any) => (
+    const StatCard = ({ title, value, icon: Icon, gradient, delay }: { title: string; value?: number; icon: React.ElementType; gradient: string; delay: number }) => (
         <div
             className={`relative overflow-hidden p-6 rounded-xl shadow-lg text-white ${gradient} transform transition-all duration-300 hover:scale-105 hover:shadow-2xl animate-fade-in-up`}
             style={{ animationDelay: `${delay}ms` }}
@@ -165,7 +186,7 @@ export default function DailyReportPage() {
                     title="Profit"
                     value={stats?.profit}
                     icon={Package}
-                    gradient={stats?.profit >= 0
+                    gradient={(stats?.profit || 0) >= 0
                         ? "bg-gradient-to-br from-indigo-500 to-indigo-700"
                         : "bg-gradient-to-br from-red-600 to-red-800"}
                     delay={300}
@@ -194,7 +215,7 @@ export default function DailyReportPage() {
                     </div>
                     <div className="flex justify-between items-center pt-3 border-t-2 border-gray-300">
                         <span className="text-lg font-bold text-gray-900">Net Profit</span>
-                        <span className={`text-2xl font-bold ${stats?.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <span className={`text-2xl font-bold ${(stats?.profit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             ₹{stats?.profit?.toFixed(2)}
                         </span>
                     </div>

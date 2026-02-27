@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth';
 import productRoutes from './routes/products';
 import transactionRoutes from './routes/transactions';
@@ -20,8 +22,24 @@ import compression from 'compression'; // [NEW]
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Trust proxy if we are behind a reverse proxy (like Render, Railway, Vercel) for accurate client IPs
+app.set('trust proxy', 1);
+
+app.use(morgan('dev')); // [NEW] Request logging
 app.use(compression()); // [NEW] Compress all routes
 app.use(express.json());
+
+// Global Rate Limiting for auth and upload to prevent abuse
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.'
+});
+
+const uploadLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 50, // limit each IP to 50 uploads per hour
+});
 
 
 // Configure CORS to allow frontend domains
@@ -48,8 +66,8 @@ app.use(
             if (isAllowed) {
                 callback(null, true);
             } else {
-                console.log("Blocked by CORS:", origin);
-                callback(null, true); // Allow anyway but log it for debugging
+                console.warn("Blocked by CORS:", origin);
+                callback(new Error('Not allowed by CORS'));
             }
         },
         credentials: true,
@@ -69,7 +87,7 @@ app.get('/', (req, res) => {
 });
 
 // Routes
-app.use('/auth', authRoutes);
+app.use('/auth', authLimiter, authRoutes);
 app.use('/products', productRoutes);
 app.use('/', transactionRoutes); // /purchases, /sales, /expenses
 app.use('/reports', reportRoutes);
@@ -77,15 +95,60 @@ app.use('/waste', wasteRoutes);
 app.use('/customers', customersRoutes);
 app.use('/finance', financeRoutes);
 app.use('/stock', stockRoutes);
-app.use('/upload', uploadRouter); // [NEW] Mount upload route
+app.use('/upload', uploadLimiter, uploadRouter); // [NEW] Mount upload route
 
 
 app.get('/supabase-test', async (req, res) => {
-    const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });
+    const { count, error } = await supabase.from('products').select('id', { count: 'exact', head: true });
     if (error) {
         res.status(500).json({ status: 'error', message: error.message });
     } else {
-        res.json({ status: 'connected', count: data });
+        res.json({ status: 'connected', count: count ?? null });
+    }
+});
+
+app.get('/health/deps', async (_req, res) => {
+    try {
+        const startedAt = Date.now();
+        const { error, count } = await supabase
+            .from('products')
+            .select('id', { count: 'exact', head: true });
+        const latencyMs = Date.now() - startedAt;
+
+        if (error) {
+            return res.status(503).json({
+                status: 'degraded',
+                timestamp: new Date().toISOString(),
+                supabase: {
+                    reachable: false,
+                    latency_ms: latencyMs,
+                    message: error.message || 'Supabase query failed',
+                    code: error.code || null,
+                }
+            });
+        }
+
+        return res.json({
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            supabase: {
+                reachable: true,
+                latency_ms: latencyMs,
+                products_count: count ?? null,
+            }
+        });
+    } catch (error: unknown) {
+        const err = error as { message?: string; code?: string; cause?: { code?: string; message?: string } };
+        return res.status(503).json({
+            status: 'degraded',
+            timestamp: new Date().toISOString(),
+            supabase: {
+                reachable: false,
+                message: err.message || 'Supabase unreachable',
+                code: err.code || err.cause?.code || null,
+                cause: err.cause?.message || null
+            }
+        });
     }
 });
 
@@ -93,20 +156,49 @@ app.get('/supabase-test', async (req, res) => {
 const initCalendar = async () => {
     const startDate = new Date();
     startDate.setFullYear(startDate.getFullYear() - 2);
+    startDate.setUTCDate(1);
+    startDate.setUTCHours(0, 0, 0, 0);
+
     const endDate = new Date();
     endDate.setFullYear(endDate.getFullYear() + 1);
+    endDate.setUTCDate(1);
+    endDate.setUTCHours(0, 0, 0, 0);
 
-    const { error } = await supabase.rpc('populate_calendar_months', {
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString()
-    });
+    const months: { month_start: string }[] = [];
+    const cursor = new Date(startDate);
+    while (cursor <= endDate) {
+        months.push({ month_start: cursor.toISOString().split('T')[0] });
+        cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+
+    const { error } = await supabase
+        .from('calendar_months')
+        .upsert(months, { onConflict: 'month_start', ignoreDuplicates: true });
 
     if (error) {
-        console.error('Error initializing calendar:', error);
+        const isNetworkTimeout =
+            error.message?.includes('fetch failed') ||
+            error.details?.includes('UND_ERR_CONNECT_TIMEOUT') ||
+            error.message?.includes('AbortError') ||
+            error.details?.includes('AbortError');
+
+        if (isNetworkTimeout) {
+            console.warn('Calendar initialization skipped: Supabase is currently unreachable or request timed out.');
+        } else {
+            console.error('Error initializing calendar:', error);
+        }
     } else {
         console.log('Calendar months initialized');
     }
 };
+
+// Error handling middleware should be added after all routes
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Server error:', err.message || err);
+    res.status(err.status || 500).json({
+        error: err.message || 'Internal Server Error'
+    });
+});
 
 
 app.listen(port, () => {

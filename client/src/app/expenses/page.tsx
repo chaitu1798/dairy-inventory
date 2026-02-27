@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Plus, Trash2, Edit2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Expense } from '../../types';
 import ConfirmationDialog from '../../components/ui/ConfirmationDialog';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -23,7 +24,7 @@ const expenseSchema = z.object({
 type ExpenseFormData = z.infer<typeof expenseSchema>;
 
 export default function ExpensesPage() {
-    const [expenses, setExpenses] = useState<any[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -73,7 +74,7 @@ export default function ExpensesPage() {
                 setExpenses(res.data);
             }
         } catch (error) {
-            console.error('Error fetching expenses:', error);
+            console.warn('Error fetching expenses:', error);
             toast.error('Failed to load expenses');
         } finally {
             setLoading(false);
@@ -99,13 +100,13 @@ export default function ExpensesPage() {
             setIsEditing(false);
             setEditId(null);
             fetchExpenses();
-        } catch (error: any) {
-            console.error('Error recording expense:', error);
-            toast.error(error.serverMessage || 'Error recording expense');
+        } catch (error) {
+            console.warn('Error recording expense:', error);
+            toast.error((error as any).serverMessage || 'Error recording expense');
         }
     };
 
-    const handleEdit = (expense: any) => {
+    const handleEdit = (expense: Expense) => {
         setValue('category', expense.category);
         setValue('amount', expense.amount);
         setValue('notes', expense.notes || '');
@@ -139,7 +140,7 @@ export default function ExpensesPage() {
             toast.success('Expense deleted successfully');
             fetchExpenses();
         } catch (error) {
-            console.error('Error deleting expense:', error);
+            console.warn('Error deleting expense:', error);
             toast.error('Failed to delete expense record');
         } finally {
             setIsDeleteDialogOpen(false);

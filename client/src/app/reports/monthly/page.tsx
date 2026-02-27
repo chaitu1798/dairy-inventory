@@ -4,10 +4,19 @@ import { useState, useEffect } from 'react';
 import api from '../../../utils/api';
 import { TrendingUp, ShoppingCart, DollarSign, Trash2, TrendingDown } from 'lucide-react';
 
+interface MonthlyReportData {
+    month: string;
+    total_sales?: number;
+    total_purchases?: number;
+    total_expenses?: number;
+    total_waste?: number;
+    profit?: number;
+}
+
 export default function MonthlyReportPage() {
     const [month, setMonth] = useState(new Date().getMonth() + 1);
     const [year, setYear] = useState(new Date().getFullYear());
-    const [reportData, setReportData] = useState<any[]>([]);
+    const [reportData, setReportData] = useState<MonthlyReportData[]>([]);
 
     useEffect(() => {
         fetchReport();
@@ -18,7 +27,7 @@ export default function MonthlyReportPage() {
             const res = await api.get(`/reports/monthly?month=${month}&year=${year}`);
             setReportData(res.data);
         } catch (error) {
-            console.error('Error fetching report:', error);
+            console.warn('Error fetching report:', error);
         }
     };
 
@@ -28,7 +37,7 @@ export default function MonthlyReportPage() {
     const totalWaste = reportData.reduce((acc, curr) => acc + (curr.total_waste || 0), 0);
     const netProfit = totalSales - totalPurchases - totalExpenses - totalWaste;
 
-    const StatCard = ({ title, value, icon: Icon, color }: any) => (
+    const StatCard = ({ title, value, icon: Icon, color }: { title: string; value: number; icon: React.ElementType; color: string }) => (
         <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
                 <div>
@@ -130,7 +139,7 @@ export default function MonthlyReportPage() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">₹{row.total_purchases?.toFixed(2)}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-rose-600">₹{row.total_expenses?.toFixed(2)}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">₹{row.total_waste?.toFixed(2)}</td>
-                                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${row.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${(row.profit || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                         ₹{row.profit?.toFixed(2)}
                                     </td>
                                 </tr>

@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Plus, Trash2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Product, Waste } from '../../types';
 import { toast } from 'sonner';
 
 export default function WastePage() {
-    const [products, setProducts] = useState<any[]>([]);
-    const [wasteRecords, setWasteRecords] = useState<any[]>([]);
-    const [summary, setSummary] = useState<any>(null);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [wasteRecords, setWasteRecords] = useState<Waste[]>([]);
+    const [summary, setSummary] = useState<{ total_waste_value: number; waste_by_reason: Record<string, number> } | null>(null);
     const [formData, setFormData] = useState({
         product_id: '',
         quantity: '',
@@ -23,26 +24,6 @@ export default function WastePage() {
     const [totalItems, setTotalItems] = useState(0);
     const ITEMS_PER_PAGE = 50;
 
-    useEffect(() => {
-        fetchProducts();
-        fetchSummary();
-    }, []);
-
-    useEffect(() => {
-        fetchWasteRecords(currentPage);
-    }, [currentPage]);
-
-    useEffect(() => {
-        // Auto-calculate cost value when product and quantity change
-        if (formData.product_id && formData.quantity) {
-            const product = products.find(p => p.id === Number.parseInt(formData.product_id, 10));
-            if (product) {
-                const costValue = Number.parseFloat(formData.quantity) * Number.parseFloat(product.cost_price);
-                setFormData(prev => ({ ...prev, cost_value: costValue.toFixed(2) }));
-            }
-        }
-    }, [formData.product_id, formData.quantity, products]);
-
     const fetchProducts = async () => {
         try {
             const res = await api.get('/products?limit=1000');
@@ -54,7 +35,7 @@ export default function WastePage() {
                 setProducts([]);
             }
         } catch (error) {
-            console.error('Error fetching products:', error);
+            console.warn('Error fetching products:', error);
             setProducts([]);
         }
     };
@@ -70,7 +51,7 @@ export default function WastePage() {
                 setWasteRecords(res.data);
             }
         } catch (error) {
-            console.error('Error fetching waste records:', error);
+            console.warn('Error fetching waste records:', error);
         }
     };
 
@@ -79,9 +60,29 @@ export default function WastePage() {
             const res = await api.get('/waste/summary');
             setSummary(res.data);
         } catch (error) {
-            console.error('Error fetching summary:', error);
+            console.warn('Error fetching summary:', error);
         }
     };
+
+    useEffect(() => {
+        fetchProducts();
+        fetchSummary();
+    }, []);
+
+    useEffect(() => {
+        fetchWasteRecords(currentPage);
+    }, [currentPage]);
+
+    useEffect(() => {
+        // Auto-calculate cost value when product and quantity change
+        if (formData.product_id && formData.quantity) {
+            const product = products.find(p => p.id === Number.parseInt(formData.product_id, 10));
+            if (product) {
+                const costValue = Number.parseFloat(formData.quantity) * Number.parseFloat(String(product.cost_price || 0));
+                setFormData(prev => ({ ...prev, cost_value: costValue.toFixed(2) }));
+            }
+        }
+    }, [formData.product_id, formData.quantity, products]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -98,14 +99,14 @@ export default function WastePage() {
             });
             fetchWasteRecords();
             fetchSummary();
-        } catch (error: any) {
-            console.error('Error recording waste:', error);
-            toast.error(error.serverMessage || 'Error recording waste');
+        } catch (error) {
+            console.warn('Error recording waste:', error);
+            toast.error((error as any).serverMessage || 'Error recording waste');
         }
     };
 
     const getReasonBadge = (reason: string) => {
-        const colors: any = {
+        const colors: Record<string, string> = {
             expired: 'bg-red-100 text-red-700',
             damaged: 'bg-orange-100 text-orange-700',
             other: 'bg-gray-100 text-gray-700'
@@ -138,7 +139,7 @@ export default function WastePage() {
                     <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                         <h3 className="text-sm font-semibold text-gray-600 mb-3">Waste by Reason</h3>
                         <div className="space-y-2">
-                            {summary.waste_by_reason && Object.entries(summary.waste_by_reason).map(([reason, value]: any) => (
+                            {summary.waste_by_reason && Object.entries(summary.waste_by_reason).map(([reason, value]: [string, number]) => (
                                 <div key={reason} className="flex justify-between items-center">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${getReasonBadge(reason)}`}>
                                         {reason.charAt(0).toUpperCase() + reason.slice(1)}

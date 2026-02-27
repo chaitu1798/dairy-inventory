@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import api from '../../utils/api';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
+import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -48,20 +48,26 @@ export default function LoginPage() {
             } else {
                 throw new Error('Invalid response from server');
             }
-        } catch (err: any) {
-            console.error('Login detailed error:', {
-                message: err.message,
-                response: err.response?.data,
-                status: err.response?.status
-            });
+        } catch (err: unknown) {
+            // Use console.warn instead of console.error to avoid Next.js dev error overlay
+            // being triggered for expected authentication failures
+            console.warn('Login attempt failed:', err);
 
             let errorMessage = 'Login failed. Please check your credentials.';
 
-            // Handle specific Supabase errors
-            if (err.response?.data?.error) {
-                errorMessage = err.response.data.error;
-            } else if (err.message) {
+            // Handle specific Axios and backend errors
+            if (axios.isAxiosError(err)) {
+                if (err.code === 'ERR_NETWORK') {
+                    errorMessage = 'Unable to reach the server. Check NEXT_PUBLIC_API_URL and backend status.';
+                }
+                const serverMessage = err.response?.data?.error || err.response?.data?.message || err.message;
+                if (serverMessage && err.code !== 'ERR_NETWORK' && !serverMessage.includes('status code 400') && !serverMessage.includes('status code 401')) {
+                    errorMessage = serverMessage;
+                }
+            } else if (err instanceof Error) {
                 errorMessage = err.message;
+            } else if (typeof err === 'string') {
+                errorMessage = err;
             }
 
             setServerError(errorMessage);

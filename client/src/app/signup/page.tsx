@@ -38,9 +38,10 @@ export default function SignupPage() {
                 toast.success('Account created successfully! Please sign in.');
                 router.push('/login');
             }
-        } catch (err: unknown) {
-            console.error('Signup error:', err);
-            const errorMessage = err instanceof Error ? (err as any).response?.data?.error || err.message : 'Signup failed. Please try again.';
+        } catch (err) {
+            console.warn('Signup error:', err);
+            const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+            const errorMessage = axiosError.response?.data?.error || axiosError.message || 'Signup failed. Please try again.';
             setServerError(errorMessage);
         }
     };

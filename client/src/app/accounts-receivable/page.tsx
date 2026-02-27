@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../../utils/api';
 import { DollarSign, Clock, AlertCircle, CheckCircle, Calendar } from 'lucide-react';
+import { Sale } from '../../types';
 import { toast } from 'sonner';
 
 export default function AccountsReceivablePage() {
@@ -11,27 +12,22 @@ export default function AccountsReceivablePage() {
         overdueAmount: 0,
         pendingAmount: 0
     });
-    const [invoices, setInvoices] = useState<any[]>([]);
+    const [invoices, setInvoices] = useState<Sale[]>([]);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-    const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+    const [selectedInvoice, setSelectedInvoice] = useState<Sale | null>(null);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Cash');
 
-    useEffect(() => {
-        fetchStats();
-        fetchInvoices();
-    }, []);
-
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
         try {
             const res = await api.get('/finance/ar/stats');
             setStats(res.data);
         } catch (error) {
-            console.error('Error fetching AR stats:', error);
+            console.warn('Error fetching AR stats:', error);
         }
-    };
+    }, []);
 
-    const fetchInvoices = async () => {
+    const fetchInvoices = useCallback(async () => {
         try {
             // Fetch sales that are pending or overdue
             // We might need a specific endpoint for this or filter client-side for now
@@ -46,17 +42,24 @@ export default function AccountsReceivablePage() {
                 allSales = res.data;
             }
 
-            const unpaidInvoices = allSales.filter((s: any) => s.status === 'pending' || s.status === 'overdue');
+            const unpaidInvoices = allSales.filter((s: Sale) => s.status === 'pending' || s.status === 'overdue');
             setInvoices(unpaidInvoices);
         } catch (error) {
-            console.error('Error fetching invoices:', error);
+            console.warn('Error fetching invoices:', error);
             setInvoices([]);
         }
-    };
+    }, []);
 
-    const handleRecordPayment = (invoice: any) => {
+    useEffect(() => {
+        fetchStats();
+        fetchInvoices();
+    }, [fetchStats, fetchInvoices]);
+
+
+
+    const handleRecordPayment = (invoice: Sale) => {
         setSelectedInvoice(invoice);
-        setPaymentAmount((invoice.total - (invoice.amount_paid || 0)).toString());
+        setPaymentAmount(((invoice.total || (invoice.quantity * invoice.price)) - (invoice.amount_paid || 0)).toString());
         setPaymentModalOpen(true);
     };
 
@@ -79,9 +82,9 @@ export default function AccountsReceivablePage() {
             fetchStats();
             fetchInvoices();
             toast.success('Payment recorded successfully!');
-        } catch (error: any) {
-            console.error('Error recording payment:', error);
-            toast.error(error.serverMessage || 'Failed to record payment');
+        } catch (error) {
+            console.warn('Error recording payment:', error);
+            toast.error((error as any).serverMessage || 'Failed to record payment');
         }
     };
 

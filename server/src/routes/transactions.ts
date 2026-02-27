@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
 import { requireAuth } from '../middleware/auth';
-
+import { validateRequest } from '../middleware/validateRequest';
+import { PurchaseSchema, SaleSchema, ExpenseSchema } from '../schemas';
 const router = Router();
 
 // Purchases
-router.get('/purchases', async (req, res) => {
+router.get('/purchases', requireAuth, async (req, res) => {
     const { startDate, endDate } = req.query;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
@@ -39,7 +40,7 @@ router.get('/purchases', async (req, res) => {
     });
 });
 
-router.post('/purchases', requireAuth, async (req, res) => {
+router.post('/purchases', requireAuth, validateRequest(PurchaseSchema), async (req, res) => {
     const { product_id, quantity, purchase_date, expiry_date, image_url } = req.body;
 
     // Sanitize dates
@@ -84,7 +85,7 @@ router.post('/purchases', requireAuth, async (req, res) => {
     res.json(data);
 });
 
-router.put('/purchases/:id', requireAuth, async (req, res) => {
+router.put('/purchases/:id', requireAuth, validateRequest(PurchaseSchema), async (req, res) => {
     const { id } = req.params;
     const { product_id, quantity, purchase_date, expiry_date } = req.body;
 
@@ -113,7 +114,7 @@ router.delete('/purchases/:id', requireAuth, async (req, res) => {
 });
 
 // Sales
-router.get('/sales', async (req, res) => {
+router.get('/sales', requireAuth, async (req, res) => {
     const { startDate, endDate } = req.query;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
@@ -150,7 +151,7 @@ router.get('/sales', async (req, res) => {
     });
 });
 
-router.post('/sales', requireAuth, async (req, res) => {
+router.post('/sales', requireAuth, validateRequest(SaleSchema), async (req, res) => {
     const { product_id, quantity, sale_date, customer_id, status, due_date } = req.body;
 
     // Sanitize dates
@@ -205,7 +206,7 @@ router.post('/sales', requireAuth, async (req, res) => {
     res.json(data);
 });
 
-router.put('/sales/:id', requireAuth, async (req, res) => {
+router.put('/sales/:id', requireAuth, validateRequest(SaleSchema), async (req, res) => {
     const { id } = req.params;
     const { product_id, customer_id, quantity, price, sale_date, status, due_date } = req.body;
 
@@ -242,7 +243,7 @@ router.delete('/sales/:id', requireAuth, async (req, res) => {
 });
 
 // Expenses
-router.get('/expenses', async (req, res) => {
+router.get('/expenses', requireAuth, async (req, res) => {
     const { startDate, endDate } = req.query;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
@@ -270,7 +271,7 @@ router.get('/expenses', async (req, res) => {
     });
 });
 
-router.post('/expenses', requireAuth, async (req, res) => {
+router.post('/expenses', requireAuth, validateRequest(ExpenseSchema), async (req, res) => {
     const { category, amount, notes, expense_date } = req.body;
     const { data, error } = await supabase
         .from('expenses')
@@ -281,7 +282,7 @@ router.post('/expenses', requireAuth, async (req, res) => {
     res.json(data);
 });
 
-router.put('/expenses/:id', requireAuth, async (req, res) => {
+router.put('/expenses/:id', requireAuth, validateRequest(ExpenseSchema), async (req, res) => {
     const { id } = req.params;
     const { category, amount, notes, expense_date } = req.body;
 

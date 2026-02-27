@@ -1,18 +1,10 @@
 import axios from 'axios';
+import { getApiBaseUrl } from './apiBaseUrl';
 
-// Robust base URL determination
-let baseURL = process.env.NEXT_PUBLIC_API_URL;
-
-// If running in browser on localhost and no env var is set, default to port 3001
-if (!baseURL && typeof globalThis.window !== 'undefined' && globalThis.window.location.hostname === 'localhost') {
-    baseURL = 'http://localhost:3001';
-}
-
-// Final fallback
-baseURL = baseURL || 'http://localhost:3001';
+const baseURL = getApiBaseUrl();
 
 if (process.env.NODE_ENV === 'development') {
-    console.log('API Base URL:', baseURL);
+    console.log('API Base URL:', baseURL || '(same-origin)');
 }
 
 const api = axios.create({
@@ -63,7 +55,7 @@ api.interceptors.request.use(request => {
                 }
             }
         } catch (e) {
-            console.error('Error reading user token for API request:', e);
+            console.warn('Error reading user token for API request:', e);
         }
     }
 

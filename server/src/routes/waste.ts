@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
 import { requireAuth } from '../middleware/auth';
-
+import { validateRequest } from '../middleware/validateRequest';
+import { WasteSchema } from '../schemas';
 const router = Router();
 
 // Create waste record
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, validateRequest(WasteSchema), async (req, res) => {
     const { product_id, quantity, reason, cost_value, waste_date, notes } = req.body;
 
     // Validate reason
@@ -30,7 +31,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // Get waste records with optional date filtering
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
     const { start_date, end_date } = req.query;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
@@ -70,7 +71,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get waste summary statistics
-router.get('/summary', async (req, res) => {
+router.get('/summary', requireAuth, async (req, res) => {
     const { start_date, end_date } = req.query;
 
     // Total waste value
@@ -138,7 +139,7 @@ router.get('/summary', async (req, res) => {
 });
 
 // Update waste record
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, validateRequest(WasteSchema), async (req, res) => {
     const { id } = req.params;
     const { product_id, quantity, reason, cost_value, waste_date, notes } = req.body;
 

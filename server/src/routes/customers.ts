@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
 import { requireAuth } from '../middleware/auth';
-
+import { validateRequest } from '../middleware/validateRequest';
+import { CustomerSchema } from '../schemas';
 const router = Router();
 
 // Get all customers
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
     const { data, error } = await supabase
         .from('customers')
         .select('*')
@@ -16,7 +17,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create customer
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, validateRequest(CustomerSchema), async (req, res) => {
     const { name, phone, email, address, credit_limit } = req.body;
     const { data, error } = await supabase
         .from('customers')
@@ -28,7 +29,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // Update customer
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, validateRequest(CustomerSchema), async (req, res) => {
     const { id } = req.params;
     const { name, phone, email, address, credit_limit } = req.body;
 

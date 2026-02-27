@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Plus, Trash2, Edit2, Phone, MapPin } from 'lucide-react';
+import { Customer } from '../../types';
 import ConfirmationDialog from '../../components/ui/ConfirmationDialog';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -23,7 +24,7 @@ const customerSchema = z.object({
 type CustomerFormData = z.infer<typeof customerSchema>;
 
 export default function CustomersPage() {
-    const [customers, setCustomers] = useState<any[]>([]);
+    const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [isEditing, setIsEditing] = useState(false);
@@ -59,7 +60,7 @@ export default function CustomersPage() {
             const res = await api.get('/customers');
             setCustomers(res.data);
         } catch (error) {
-            console.error('Error fetching customers:', error);
+            console.warn('Error fetching customers:', error);
             toast.error('Failed to load customers');
         } finally {
             setLoading(false);
@@ -85,13 +86,13 @@ export default function CustomersPage() {
             setIsEditing(false);
             setEditId(null);
             fetchCustomers();
-        } catch (error: any) {
-            console.error('Error saving customer:', error);
-            toast.error(error.serverMessage || 'Error saving customer');
+        } catch (error) {
+            console.warn('Error saving customer:', error);
+            toast.error((error as any).serverMessage || 'Error saving customer');
         }
     };
 
-    const handleEdit = (customer: any) => {
+    const handleEdit = (customer: Customer) => {
         setValue('name', customer.name);
         setValue('phone', customer.phone || '');
         setValue('address', customer.address || '');
@@ -126,7 +127,7 @@ export default function CustomersPage() {
             toast.success('Customer deleted successfully');
             fetchCustomers();
         } catch (error) {
-            console.error('Error deleting customer:', error);
+            console.warn('Error deleting customer:', error);
             toast.error('Failed to delete customer. They may have active sales.');
         } finally {
             setIsDeleteDialogOpen(false);

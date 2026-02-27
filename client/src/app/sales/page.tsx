@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Plus, Trash2, Edit2, ChevronLeft, ChevronRight, Search, Calendar } from 'lucide-react';
+import { Product, Customer, Sale } from '../../types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -36,9 +37,9 @@ const salesSchema = z.object({
 type SalesFormData = z.infer<typeof salesSchema>;
 
 export default function SalesPage() {
-    const [products, setProducts] = useState<any[]>([]);
-    const [customers, setCustomers] = useState<any[]>([]);
-    const [sales, setSales] = useState<any[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [sales, setSales] = useState<Sale[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -96,7 +97,7 @@ export default function SalesPage() {
                 setProducts([]);
             }
         } catch (error) {
-            console.error('Error fetching products:', error);
+            console.warn('Error fetching products:', error);
             toast.error('Failed to load products');
         }
     };
@@ -106,7 +107,7 @@ export default function SalesPage() {
             const res = await api.get('/customers');
             setCustomers(res.data);
         } catch (error) {
-            console.error('Error fetching customers:', error);
+            console.warn('Error fetching customers:', error);
         }
     };
 
@@ -122,7 +123,7 @@ export default function SalesPage() {
                 setSales(res.data);
             }
         } catch (error) {
-            console.error('Error fetching sales:', error);
+            console.warn('Error fetching sales:', error);
             toast.error('Failed to load sales');
         } finally {
             setLoading(false);
@@ -157,13 +158,13 @@ export default function SalesPage() {
             setIsEditing(false);
             setEditId(null);
             fetchSales();
-        } catch (error: any) {
-            console.error('Error recording sale:', error);
-            toast.error(error.serverMessage || 'Error recording sale');
+        } catch (error) {
+            console.warn('Error recording sale:', error);
+            toast.error((error as any).serverMessage || 'Error recording sale');
         }
     };
 
-    const handleEdit = (sale: any) => {
+    const handleEdit = (sale: Sale) => {
         setIsEditing(true);
         setEditId(sale.id);
         reset({
@@ -203,7 +204,7 @@ export default function SalesPage() {
             toast.success('Sale deleted successfully');
             fetchSales();
         } catch (error) {
-            console.error('Error deleting sale:', error);
+            console.warn('Error deleting sale:', error);
             toast.error('Failed to delete sale record');
         } finally {
             setIsDeleteDialogOpen(false);

@@ -11,9 +11,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const supabase_1 = require("../supabase");
+const auth_1 = require("../middleware/auth");
+const validateRequest_1 = require("../middleware/validateRequest");
+const schemas_1 = require("../schemas");
 const router = (0, express_1.Router)();
 // Create waste record
-router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(schemas_1.WasteSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { product_id, quantity, reason, cost_value, waste_date, notes } = req.body;
     // Validate reason
     if (!['expired', 'damaged', 'other'].includes(reason)) {
@@ -21,15 +24,26 @@ router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
     const { data, error } = yield supabase_1.supabase
         .from('waste')
-        .insert([{ product_id, quantity, reason, cost_value, waste_date, notes }])
+        .insert([{
+            product_id: parseInt(product_id),
+            quantity: parseFloat(quantity),
+            reason,
+            cost_value: parseFloat(cost_value),
+            waste_date,
+            notes
+        }])
         .select();
     if (error)
         return res.status(400).json({ error: error.message });
     res.json(data);
 }));
 // Get waste records with optional date filtering
-router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/', auth_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { start_date, end_date } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
     let query = supabase_1.supabase
         .from('waste')
         .select(`
@@ -40,21 +54,27 @@ router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 category,
                 unit
             )
-        `)
-        .order('waste_date', { ascending: false });
+        `, { count: 'exact' })
+        .order('waste_date', { ascending: false })
+        .range(start, end);
     if (start_date) {
         query = query.gte('waste_date', start_date);
     }
     if (end_date) {
         query = query.lte('waste_date', end_date);
     }
-    const { data, error } = yield query;
+    const { data, count, error } = yield query;
     if (error)
         return res.status(400).json({ error: error.message });
-    res.json(data);
+    res.json({
+        data,
+        count,
+        page,
+        totalPages: count ? Math.ceil(count / limit) : 0
+    });
 }));
 // Get waste summary statistics
-router.get('/summary', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/summary', auth_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { start_date, end_date } = req.query;
     // Total waste value
     let totalQuery = supabase_1.supabase
@@ -116,5 +136,44 @@ router.get('/summary', (req, res) => __awaiter(void 0, void 0, void 0, function*
         waste_by_reason: wasteByReason,
         waste_by_product: wasteByProduct
     });
+}));
+// Update waste record
+router.put('/:id', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(schemas_1.WasteSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const { product_id, quantity, reason, cost_value, waste_date, notes } = req.body;
+    // Create clean update object
+    const updates = {};
+    if (product_id !== undefined)
+        updates.product_id = parseInt(product_id);
+    if (quantity !== undefined)
+        updates.quantity = parseFloat(quantity);
+    if (reason !== undefined) {
+        if (!['expired', 'damaged', 'other'].includes(reason)) {
+            return res.status(400).json({ error: 'Invalid reason. Must be expired, damaged, or other' });
+        }
+        updates.reason = reason;
+    }
+    if (cost_value !== undefined)
+        updates.cost_value = parseFloat(cost_value);
+    if (waste_date !== undefined)
+        updates.waste_date = waste_date;
+    if (notes !== undefined)
+        updates.notes = notes;
+    const { data, error } = yield supabase_1.supabase
+        .from('waste')
+        .update(updates)
+        .eq('id', id)
+        .select();
+    if (error)
+        return res.status(400).json({ error: error.message });
+    res.json(data);
+}));
+// Delete waste record
+router.delete('/:id', auth_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const { error } = yield supabase_1.supabase.from('waste').delete().eq('id', id);
+    if (error)
+        return res.status(400).json({ error: error.message });
+    res.json({ message: 'Waste record deleted' });
 }));
 exports.default = router;

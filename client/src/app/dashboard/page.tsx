@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import api from '../../utils/api';
 import { DollarSign, ShoppingCart, TrendingUp, Package, AlertTriangle, Clock, TrendingDown, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { DashboardStats, Product } from '../../types';
 import Input from '../../components/ui/Input';
 import Tooltip from '../../components/ui/Tooltip'; // [NEW]
 import { Button } from '../../components/ui/Button';
@@ -45,10 +46,10 @@ const SortIcon = ({ field, sortBy, sortOrder }: SortIconProps) => {
 };
 
 export default function Dashboard() {
-    const [dashboardData, setDashboardData] = useState<any>(null);
-    const [inventory, setInventory] = useState<any[]>([]);
-    const [expiringItems, setExpiringItems] = useState<any[]>([]);
-    const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+    const [dashboardData, setDashboardData] = useState<DashboardStats | null>(null);
+    const [inventory, setInventory] = useState<Product[]>([]);
+    const [expiringItems, setExpiringItems] = useState<Product[]>([]);
+    const [lowStockItems, setLowStockItems] = useState<Product[]>([]);
 
     // Inventory Table State
     const [page, setPage] = useState(1);
@@ -77,7 +78,7 @@ export default function Dashboard() {
             const res = await api.get('/reports/dashboard');
             setDashboardData(res.data);
         } catch (error) {
-            console.error('Error fetching dashboard data:', error);
+            console.warn('Error fetching dashboard data:', error);
         }
     };
 
@@ -93,7 +94,7 @@ export default function Dashboard() {
                 setTotalPages(res.data.totalPages);
             }
         } catch (error) {
-            console.error('Error fetching inventory:', error);
+            console.warn('Error fetching inventory:', error);
         } finally {
             setIsLoadingInventory(false);
         }
@@ -113,7 +114,7 @@ export default function Dashboard() {
             const res = await api.get('/reports/expiring');
             setExpiringItems(res.data);
         } catch (error) {
-            console.error('Error fetching expiring items:', error);
+            console.warn('Error fetching expiring items:', error);
         }
     };
 
@@ -122,7 +123,7 @@ export default function Dashboard() {
             const res = await api.get('/reports/low-stock');
             setLowStockItems(res.data);
         } catch (error) {
-            console.error('Error fetching low stock items:', error);
+            console.warn('Error fetching low stock items:', error);
         }
     };
 
@@ -140,30 +141,30 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                     <StatCard
                         title="Sales"
-                        value={dashboardData?.today?.total_sales}
+                        value={dashboardData?.today?.total_sales ?? 0}
                         icon={TrendingUp}
                         color="bg-emerald-50 text-emerald-600"
                         suffix="₹"
                     />
                     <StatCard
                         title="Purchases"
-                        value={dashboardData?.today?.total_purchases}
+                        value={dashboardData?.today?.total_purchases ?? 0}
                         icon={ShoppingCart}
                         color="bg-blue-50 text-blue-600"
                         suffix="₹"
                     />
                     <StatCard
                         title="Expenses"
-                        value={dashboardData?.today?.total_expenses}
+                        value={dashboardData?.today?.total_expenses ?? 0}
                         icon={DollarSign}
                         color="bg-rose-50 text-rose-600"
                         suffix="₹"
                     />
                     <StatCard
                         title="Net Profit"
-                        value={dashboardData?.today?.net}
+                        value={dashboardData?.today?.net ?? 0}
                         icon={Package}
-                        color={dashboardData?.today?.net >= 0
+                        color={(dashboardData?.today?.net ?? 0) >= 0
                             ? "bg-indigo-50 text-indigo-600"
                             : "bg-orange-50 text-orange-600"}
                         suffix="₹"
@@ -179,7 +180,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <StatCard
                         title="Total Stock Value"
-                        value={dashboardData?.total_stock_value}
+                        value={dashboardData?.total_stock_value ?? 0}
                         icon={Package}
                         color="bg-purple-50 text-purple-600"
                         suffix="₹"
@@ -251,7 +252,7 @@ export default function Dashboard() {
                                         </div>
                                         <div className="flex justify-between items-center text-xs text-gray-500">
                                             <span>{item.category}</span>
-                                            <span>Expires: {new Date(item.expiry_date).toLocaleDateString()}</span>
+                                            <span>Expires: {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : 'N/A'}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -272,7 +273,7 @@ export default function Dashboard() {
                     </div>
                     <div className="p-8">
                         <div className="space-y-6">
-                            {dashboardData.top_selling_products.map((product: any, idx: number) => (
+                            {dashboardData.top_selling_products.map((product, idx: number) => (
                                 <div key={product.id || idx} className="flex items-center justify-between">
                                     <div className="flex items-center space-x-6">
                                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-50 text-green-600 font-bold text-sm">

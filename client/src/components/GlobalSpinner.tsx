@@ -4,16 +4,33 @@ import React, { useEffect, useState } from 'react';
 import { Spinner } from './ui/Spinner';
 
 export function GlobalSpinner() {
-    const [isLoading, setIsLoading] = useState(false);
     const [requestCount, setRequestCount] = useState(0);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
+        let timer: NodeJS.Timeout;
+
         const handleRequestStart = () => {
-            setRequestCount(prev => prev + 1);
+            setRequestCount(prev => {
+                const next = prev + 1;
+                if (next > 0) {
+                    clearTimeout(timer);
+                    setIsLoading(true);
+                }
+                return next;
+            });
         };
 
         const handleRequestEnd = () => {
-            setRequestCount(prev => Math.max(0, prev - 1));
+            setRequestCount(prev => {
+                const next = Math.max(0, prev - 1);
+                if (next === 0) {
+                    timer = setTimeout(() => {
+                        setIsLoading(false);
+                    }, 200);
+                }
+                return next;
+            });
         };
 
         globalThis.window?.addEventListener('axios-request-start', handleRequestStart);
@@ -22,20 +39,9 @@ export function GlobalSpinner() {
         return () => {
             globalThis.window?.removeEventListener('axios-request-start', handleRequestStart);
             globalThis.window?.removeEventListener('axios-request-end', handleRequestEnd);
+            clearTimeout(timer);
         };
     }, []);
-
-    useEffect(() => {
-        if (requestCount > 0) {
-            setIsLoading(true);
-        } else {
-            // Small delay to prevent flickering for fast requests
-            const timer = setTimeout(() => {
-                setIsLoading(false);
-            }, 200);
-            return () => clearTimeout(timer);
-        }
-    }, [requestCount]);
 
     if (!isLoading) return null;
 

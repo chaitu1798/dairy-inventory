@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
 import { requireAuth } from '../middleware/auth';
-
+import { validateRequest } from '../middleware/validateRequest';
+import { ProductSchema } from '../schemas';
 const router = Router();
 
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50; // increased default to 50
     const start = (page - 1) * limit;
@@ -26,7 +27,7 @@ router.get('/', async (req, res) => {
     });
 });
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, validateRequest(ProductSchema), async (req, res) => {
     const { name, type, unit, price, cost_price, low_stock_threshold, track_expiry, expiry_date } = req.body;
 
     // Map frontend 'type' to backend 'category' and 'low_stock_threshold' to 'min_stock'
@@ -48,7 +49,7 @@ router.post('/', requireAuth, async (req, res) => {
     res.json(data);
 });
 
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, validateRequest(ProductSchema), async (req, res) => {
     const { id } = req.params;
     const { name, type, unit, price, cost_price, low_stock_threshold, track_expiry, expiry_date } = req.body;
 

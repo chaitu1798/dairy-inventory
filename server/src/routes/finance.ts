@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { supabase } from '../supabase';
 import { requireAuth } from '../middleware/auth';
-
+import { validateRequest } from '../middleware/validateRequest';
+import { PaymentSchema } from '../schemas';
 const router = Router();
 
 /**
@@ -9,7 +10,7 @@ const router = Router();
  */
 
 // Get AR stats
-router.get('/ar/stats', async (req, res) => {
+router.get('/ar/stats', requireAuth, async (req, res) => {
     const { data: sales, error } = await supabase
         .from('sales')
         .select('total, amount_paid, status')
@@ -43,7 +44,7 @@ router.get('/ar/stats', async (req, res) => {
  */
 
 // Get payments for a sale
-router.get('/payments/:sale_id', async (req, res) => {
+router.get('/payments/:sale_id', requireAuth, async (req, res) => {
     const { sale_id } = req.params;
     const { data, error } = await supabase
         .from('payments')
@@ -56,7 +57,7 @@ router.get('/payments/:sale_id', async (req, res) => {
 });
 
 // Record a payment
-router.post('/payments', requireAuth, async (req, res) => {
+router.post('/payments', requireAuth, validateRequest(PaymentSchema), async (req, res) => {
     const { sale_id, amount, payment_date, payment_method, notes } = req.body;
 
     // 1. Record payment

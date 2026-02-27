@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api';
 import { Plus, Calendar, Trash2, Edit2, Camera, X, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Product, Purchase } from '../../types';
 import ConfirmationDialog from '../../components/ui/ConfirmationDialog';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -28,15 +29,15 @@ const purchaseSchema = z.object({
 type PurchaseFormData = z.infer<typeof purchaseSchema>;
 
 export default function PurchasesPage() {
-    const [products, setProducts] = useState<any[]>([]);
-    const [purchases, setPurchases] = useState<any[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [purchases, setPurchases] = useState<Purchase[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
     const ITEMS_PER_PAGE = 50;
 
-    const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
     const [dateRange, setDateRange] = useState({
@@ -92,7 +93,7 @@ export default function PurchasesPage() {
             if (product?.track_expiry && product?.expiry_days && watchedPurchaseDate) {
                 const purchaseDate = new Date(watchedPurchaseDate);
                 const expiryDate = new Date(purchaseDate);
-                expiryDate.setDate(expiryDate.getDate() + Number.parseInt(product.expiry_days, 10));
+                expiryDate.setDate(expiryDate.getDate() + (product.expiry_days || 0));
                 setValue('expiry_date', expiryDate.toISOString().split('T')[0]);
             } else if (!product?.track_expiry) {
                 setValue('expiry_date', '');
@@ -116,7 +117,7 @@ export default function PurchasesPage() {
                 setProducts([]);
             }
         } catch (error) {
-            console.error('Error fetching products:', error);
+            console.warn('Error fetching products:', error);
             toast.error('Failed to load products');
             setProducts([]);
         }
@@ -134,7 +135,7 @@ export default function PurchasesPage() {
                 setPurchases(res.data);
             }
         } catch (error) {
-            console.error('Error fetching purchases:', error);
+            console.warn('Error fetching purchases:', error);
             toast.error('Failed to load purchases');
         } finally {
             setLoading(false);
@@ -162,13 +163,13 @@ export default function PurchasesPage() {
             setIsEditing(false);
             setEditId(null);
             fetchPurchases();
-        } catch (error: any) {
-            console.error('Error recording purchase:', error);
-            toast.error(error.serverMessage || 'Error recording purchase');
+        } catch (error) {
+            console.warn('Error recording purchase:', error);
+            toast.error((error as any).serverMessage || 'Error recording purchase');
         }
     };
 
-    const handleEdit = (purchase: any) => {
+    const handleEdit = (purchase: Purchase) => {
         setValue('product_id', String(purchase.product_id));
         setValue('quantity', Number(purchase.quantity));
         setValue('purchase_date', purchase.purchase_date.split('T')[0]);
@@ -204,7 +205,7 @@ export default function PurchasesPage() {
             toast.success('Purchase record deleted successfully');
             fetchPurchases();
         } catch (error) {
-            console.error('Error deleting purchase:', error);
+            console.warn('Error deleting purchase:', error);
             toast.error('Failed to delete purchase record');
         } finally {
             setIsDeleteDialogOpen(false);
@@ -229,9 +230,9 @@ export default function PurchasesPage() {
             toast.info('Uploading image...');
             const res = await api.post('/stock/upload', formData);
             uploadData = res.data;
-        } catch (uploadError: any) {
-            console.error('Upload Step Failed:', uploadError);
-            toast.error(`Upload Error: ${uploadError.message || 'Failed'}`);
+        } catch (uploadError) {
+            console.warn('Upload Step Failed:', uploadError);
+            toast.error(`Upload Error: ${(uploadError as any).message || 'Failed'}`);
             return;
         }
 
@@ -265,8 +266,8 @@ export default function PurchasesPage() {
             }
             toast.success('Analysis complete. Please verify details.');
 
-        } catch (analyzeError: any) {
-            console.error('Analysis Step Failed:', analyzeError);
+        } catch (analyzeError) {
+            console.warn('Analysis Step Failed:', analyzeError);
             toast.error('Analysis failed');
         }
     };
@@ -292,7 +293,7 @@ export default function PurchasesPage() {
             fetchPurchases();
             toast.success('Stock updated successfully!');
         } catch (error) {
-            console.error('Stock update failed', error);
+            console.warn('Stock update failed', error);
             toast.error('Failed to update stock');
         }
     };

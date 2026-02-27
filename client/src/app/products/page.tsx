@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { Plus, Trash2, Edit2, Search, Filter, Camera, X, ArrowLeft, ArrowRight, PlusCircle, MinusCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Product } from '../../types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -50,7 +51,7 @@ type StockUpdateFormData = z.infer<typeof stockUpdateSchema>;
 
 export default function ProductsPage() {
     // ... (Keep existing state)
-    const [products, setProducts] = useState<any[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -69,7 +70,7 @@ export default function ProductsPage() {
 
     // Stock Update State
     const [isStockModalOpen, setIsStockModalOpen] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [stockAction, setStockAction] = useState<'in' | 'out'>('in');
 
     // Camera/Image State
@@ -164,13 +165,13 @@ export default function ProductsPage() {
             setIsEditing(false);
             setEditId(null);
             fetchProducts(currentPage);
-        } catch (error: any) {
-            console.error('Error saving product:', error);
-            toast.error(error.serverMessage || 'Failed to save product');
+        } catch (error) {
+            console.warn('Error saving product:', error);
+            toast.error((error as any).serverMessage || 'Failed to save product');
         }
     };
 
-    const handleEdit = (product: any) => {
+    const handleEdit = (product: Product) => {
         setIsEditing(true);
         setEditId(product.id);
         reset({
@@ -178,7 +179,7 @@ export default function ProductsPage() {
             unit: product.unit,
             price: product.price,
             cost_price: product.cost_price || 0,
-            type: product.type || 'other',
+            type: (product.type as 'feed' | 'medicine' | 'supplement' | 'other') || 'other',
             track_expiry: product.track_expiry || false,
             expiry_date: product.expiry_date ? product.expiry_date.split('T')[0] : ''
         });
@@ -197,7 +198,7 @@ export default function ProductsPage() {
             toast.success('Product deleted successfully');
             fetchProducts(currentPage);
         } catch (error) {
-            console.error('Error deleting product:', error);
+            console.warn('Error deleting product:', error);
             toast.error('Failed to delete product');
         } finally {
             setIsDeleteDialogOpen(false);
@@ -218,7 +219,7 @@ export default function ProductsPage() {
         });
     };
 
-    const openStockModal = (product: any, action: 'in' | 'out') => {
+    const openStockModal = (product: Product, action: 'in' | 'out') => {
         setSelectedProduct(product);
         setStockAction(action);
         setIsStockModalOpen(true);
@@ -233,6 +234,7 @@ export default function ProductsPage() {
 
             // Create FormData object to handle file upload
             const formData = new FormData();
+            if (!selectedProduct) return;
             formData.append('product_id', String(selectedProduct.id));
             formData.append('quantity', String(data.quantity));
             formData.append('notes', data.notes || '');
@@ -257,7 +259,7 @@ export default function ProductsPage() {
             setIsStockModalOpen(false);
             fetchProducts(currentPage);
         } catch (error) {
-            console.error('Error updating stock:', error);
+            console.warn('Error updating stock:', error);
             toast.error('Failed to update stock');
         }
     };
@@ -269,7 +271,7 @@ export default function ProductsPage() {
             setStream(mediaStream);
             setIsCameraOpen(true);
         } catch (err) {
-            console.error("Error accessing camera:", err);
+            console.warn("Error accessing camera:", err);
             toast.error("Could not access camera");
         }
     };

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { getApiBaseUrl } from '../utils/apiBaseUrl';
 
 interface AuthUser {
     id: string | number;
@@ -39,7 +40,8 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
         try {
             const token = user?.session?.access_token || user?.access_token;
             if (token) {
-                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/logout`, {
+                const baseUrl = getApiBaseUrl();
+                await fetch(`${baseUrl}/auth/logout`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -48,7 +50,7 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
                 });
             }
         } catch (e) {
-            console.error('Logout API error', e);
+            console.warn('Logout API error', e);
         }
 
         setUser(null);
@@ -77,10 +79,11 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
         const storedUser = localStorage.getItem('dairy_user');
         if (storedUser) {
             try {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setUser(JSON.parse(storedUser));
                 checkSessionExpiry();
             } catch (e) {
-                console.error('Error parsing stored user', e);
+                console.warn('Error parsing stored user', e);
                 localStorage.removeItem('dairy_user');
             }
         }

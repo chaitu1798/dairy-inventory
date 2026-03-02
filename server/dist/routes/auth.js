@@ -10,76 +10,33 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const supabase_1 = require("../supabase");
+const firebase_1 = require("../firebase");
 const router = (0, express_1.Router)();
-const isUpstreamNetworkError = (error) => {
-    var _a, _b;
-    if (!error || typeof error !== 'object')
-        return false;
-    const maybeError = error;
-    const message = maybeError.message || '';
-    const causeMessage = ((_a = maybeError.cause) === null || _a === void 0 ? void 0 : _a.message) || '';
-    const code = maybeError.code || ((_b = maybeError.cause) === null || _b === void 0 ? void 0 : _b.code) || '';
-    return (message.includes('fetch failed') ||
-        causeMessage.includes('fetch failed') ||
-        code === 'UND_ERR_CONNECT_TIMEOUT' ||
-        code === 'ENOTFOUND' ||
-        code === 'ETIMEDOUT');
-};
+// Firebase Auth mostly happens on the client, so these routes are for backend operations if needed.
 router.post('/signup', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;
-        const { data, error } = yield supabase_1.supabase.auth.signUp({
+        const userRecord = yield firebase_1.auth.createUser({
             email,
             password,
         });
-        if (error)
-            return res.status(400).json({ error: error.message });
-        res.json(data);
+        res.json({ uid: userRecord.uid, email: userRecord.email });
     }
     catch (error) {
-        if (isUpstreamNetworkError(error)) {
-            return res.status(503).json({ error: 'Authentication service is unreachable. Please try again shortly.' });
-        }
         console.error('Signup error:', error);
-        return res.status(500).json({ error: 'Unexpected signup error' });
+        return res.status(400).json({ error: error.message });
     }
 }));
+// Firebase Admin SDK does not support direct login with password (it's for user management).
+// The client should use the Firebase Client SDK to login and send the ID token.
 router.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { email, password } = req.body;
-        const { data, error } = yield supabase_1.supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-        if (error)
-            return res.status(400).json({ error: error.message });
-        res.json(data);
-    }
-    catch (error) {
-        if (isUpstreamNetworkError(error)) {
-            return res.status(503).json({ error: 'Authentication service is unreachable. Please check internet/Supabase connectivity.' });
-        }
-        console.error('Login error:', error);
-        return res.status(500).json({ error: 'Unexpected login error' });
-    }
+    res.status(405).json({
+        error: 'Method Not Allowed',
+        message: 'Please use the Firebase Client SDK to login and provide the ID token via Authorization header.'
+    });
 }));
 router.post('/logout', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    try {
-        const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(' ')[1];
-        if (token) {
-            // Invalidate the session on Supabase side using admin API
-            const { error } = yield supabase_1.supabase.auth.admin.signOut(token);
-            if (error) {
-                console.error('Supabase logout error:', error);
-            }
-        }
-    }
-    catch (err) {
-        // Ignore errors during logout, we want to clear client state anyway
-        console.error('Logout error:', err);
-    }
+    // Stateless auth with Firebase ID tokens, client just needs to discard the token.
     res.json({ message: 'Logged out successfully' });
 }));
 exports.default = router;

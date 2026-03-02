@@ -1,25 +1,8 @@
 import { Router } from 'express';
-import { supabase } from '../supabase';
-
+import { collections } from '../firebase';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();
-
-type ProductRow = {
-    id: number;
-    name: string;
-    category: string | null;
-    unit: string | null;
-    cost_price: number | null;
-    min_stock: number | null;
-    expiry_date: string | null;
-    track_expiry: boolean | null;
-};
-
-type MovementRow = {
-    product_id: number;
-    quantity: number | null;
-};
 
 const toNumber = (value: unknown): number => {
     const parsed = Number(value);
@@ -41,44 +24,39 @@ const daysBetween = (fromDate: Date, toDate: Date): number => {
 
 const buildInventorySnapshot = async () => {
     const [
-        { data: products, error: productError },
-        { data: purchases, error: purchaseError },
-        { data: sales, error: salesError },
-        { data: waste, error: wasteError }
+        productSnapshot,
+        purchaseSnapshot,
+        salesSnapshot,
+        wasteSnapshot
     ] = await Promise.all([
-        supabase.from('products').select('id, name, category, unit, cost_price, min_stock, expiry_date, track_expiry'),
-        supabase.from('purchases').select('product_id, quantity'),
-        supabase.from('sales').select('product_id, quantity'),
-        supabase.from('waste').select('product_id, quantity')
+        collections.products.get(),
+        collections.purchases.get(),
+        collections.sales.get(),
+        collections.waste.get()
     ]);
 
-    if (productError || purchaseError || salesError || wasteError) {
-        throw new Error(
-            productError?.message ||
-            purchaseError?.message ||
-            salesError?.message ||
-            wasteError?.message ||
-            'Failed to build inventory snapshot'
-        );
-    }
+    const products = productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+    const purchases = purchaseSnapshot.docs.map(doc => doc.data());
+    const sales = salesSnapshot.docs.map(doc => doc.data());
+    const waste = wasteSnapshot.docs.map(doc => doc.data());
 
-    const purchasedByProduct = new Map<number, number>();
-    const soldByProduct = new Map<number, number>();
-    const wasteByProduct = new Map<number, number>();
+    const purchasedByProduct = new Map<string, number>();
+    const soldByProduct = new Map<string, number>();
+    const wasteByProduct = new Map<string, number>();
 
-    (purchases as MovementRow[] | null)?.forEach((row) => {
+    purchases.forEach((row) => {
         purchasedByProduct.set(row.product_id, (purchasedByProduct.get(row.product_id) || 0) + toNumber(row.quantity));
     });
-    (sales as MovementRow[] | null)?.forEach((row) => {
+    sales.forEach((row) => {
         soldByProduct.set(row.product_id, (soldByProduct.get(row.product_id) || 0) + toNumber(row.quantity));
     });
-    (waste as MovementRow[] | null)?.forEach((row) => {
+    waste.forEach((row) => {
         wasteByProduct.set(row.product_id, (wasteByProduct.get(row.product_id) || 0) + toNumber(row.quantity));
     });
 
     const today = new Date();
 
-    return ((products || []) as ProductRow[]).map((product) => {
+    return products.map((product) => {
         const purchased = purchasedByProduct.get(product.id) || 0;
         const sold = soldByProduct.get(product.id) || 0;
         const wasted = wasteByProduct.get(product.id) || 0;
@@ -110,31 +88,21 @@ const buildInventorySnapshot = async () => {
 
 const computeMonthlyRow = async (start: string, end: string) => {
     const [
-        { data: sales, error: salesError },
-        { data: purchases, error: purchaseError },
-        { data: expenses, error: expenseError },
-        { data: waste, error: wasteError }
+        salesSnapshot,
+        purchaseSnapshot,
+        expenseSnapshot,
+        wasteSnapshot
     ] = await Promise.all([
-        supabase.from('sales').select('total').gte('sale_date', start).lt('sale_date', end),
-        supabase.from('purchases').select('total').gte('purchase_date', start).lt('purchase_date', end),
-        supabase.from('expenses').select('amount').gte('expense_date', start).lt('expense_date', end),
-        supabase.from('waste').select('cost_value').gte('waste_date', start).lt('waste_date', end)
+        collections.sales.where('sale_date', '>=', start).where('sale_date', '<', end).get(),
+        collections.purchases.where('purchase_date', '>=', start).where('purchase_date', '<', end).get(),
+        collections.expenses.where('expense_date', '>=', start).where('expense_date', '<', end).get(),
+        collections.waste.where('waste_date', '>=', start).where('waste_date', '<', end).get()
     ]);
 
-    if (salesError || purchaseError || expenseError || wasteError) {
-        throw new Error(
-            salesError?.message ||
-            purchaseError?.message ||
-            expenseError?.message ||
-            wasteError?.message ||
-            'Failed to compute monthly report'
-        );
-    }
-
-    const totalSales = (sales || []).reduce((sum, row) => sum + toNumber((row as { total?: number }).total), 0);
-    const totalPurchases = (purchases || []).reduce((sum, row) => sum + toNumber((row as { total?: number }).total), 0);
-    const totalExpenses = (expenses || []).reduce((sum, row) => sum + toNumber((row as { amount?: number }).amount), 0);
-    const totalWaste = (waste || []).reduce((sum, row) => sum + toNumber((row as { cost_value?: number }).cost_value), 0);
+    const totalSales = salesSnapshot.docs.reduce((sum, doc) => sum + toNumber(doc.data().total), 0);
+    const totalPurchases = purchaseSnapshot.docs.reduce((sum, doc) => sum + toNumber(doc.data().total), 0);
+    const totalExpenses = expenseSnapshot.docs.reduce((sum, doc) => sum + toNumber(doc.data().amount), 0);
+    const totalWaste = wasteSnapshot.docs.reduce((sum, doc) => sum + toNumber(doc.data().cost_value), 0);
 
     return {
         month: start,
@@ -146,38 +114,33 @@ const computeMonthlyRow = async (start: string, end: string) => {
     };
 };
 
-// Dashboard endpoint - comprehensive dashboard data
+// Dashboard endpoint
 router.get('/dashboard', requireAuth, async (req, res) => {
     try {
         const targetDate = new Date().toISOString().split('T')[0];
 
-        // Run all queries in parallel for performance
         const [
-            { data: sales, error: salesError },
-            { data: purchases, error: purchasesError },
-            { data: expenses, error: expensesError },
-            { data: waste, error: wasteError },
-            { data: allSales, error: allSalesError },
-            { data: products, error: productsError },
+            todaySales,
+            todayPurchases,
+            todayExpenses,
+            todayWaste,
+            allSalesSnapshot,
+            productsSnapshot,
             inventorySnapshot
         ] = await Promise.all([
-            supabase.from('sales').select('total').eq('sale_date', targetDate),
-            supabase.from('purchases').select('total').eq('purchase_date', targetDate),
-            supabase.from('expenses').select('amount').eq('expense_date', targetDate),
-            supabase.from('waste').select('cost_value').eq('waste_date', targetDate),
-            supabase.from('sales').select('product_id, quantity'),
-            supabase.from('products').select('id, name'),
+            collections.sales.where('sale_date', '==', targetDate).get(),
+            collections.purchases.where('purchase_date', '==', targetDate).get(),
+            collections.expenses.where('expense_date', '==', targetDate).get(),
+            collections.waste.where('waste_date', '==', targetDate).get(),
+            collections.sales.select('product_id', 'quantity').get(),
+            collections.products.select('name').get(),
             buildInventorySnapshot()
         ]);
 
-        if (salesError || purchasesError || expensesError || wasteError || allSalesError || productsError) {
-            return res.status(400).json({ error: 'Error fetching dashboard data' });
-        }
-
-        const totalSales = sales?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
-        const totalPurchases = purchases?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
-        const totalExpenses = expenses?.reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
-        const totalWaste = waste?.reduce((acc, curr) => acc + (curr.cost_value || 0), 0) || 0;
+        const totalSales = todaySales.docs.reduce((acc, doc) => acc + (doc.data().total || 0), 0);
+        const totalPurchases = todayPurchases.docs.reduce((acc, doc) => acc + (doc.data().total || 0), 0);
+        const totalExpenses = todayExpenses.docs.reduce((acc, doc) => acc + (doc.data().amount || 0), 0);
+        const totalWaste = todayWaste.docs.reduce((acc, doc) => acc + (doc.data().cost_value || 0), 0);
         const totalStockValue = inventorySnapshot.reduce((acc, curr) => acc + toNumber(curr.stock_value), 0);
 
         const lowStockCount = inventorySnapshot.filter((item) => item.is_low_stock).length;
@@ -185,16 +148,17 @@ router.get('/dashboard', requireAuth, async (req, res) => {
             (item) => item.track_expiry && item.days_until_expiry !== null && item.days_until_expiry >= 0 && item.days_until_expiry <= 7
         ).length;
 
-        const salesQtyByProduct = new Map<number, number>();
-        (allSales || []).forEach((row) => {
-            const productId = (row as { product_id: number }).product_id;
-            const quantity = toNumber((row as { quantity?: number }).quantity);
-            salesQtyByProduct.set(productId, (salesQtyByProduct.get(productId) || 0) + quantity);
+        const salesQtyByProduct = new Map<string, number>();
+        allSalesSnapshot.docs.forEach((doc) => {
+            const row = doc.data();
+            salesQtyByProduct.set(row.product_id, (salesQtyByProduct.get(row.product_id) || 0) + toNumber(row.quantity));
         });
-        const productNameById = new Map<number, string>();
-        (products || []).forEach((p) => {
-            productNameById.set((p as { id: number }).id, (p as { name: string }).name);
+
+        const productNameById = new Map<string, string>();
+        productsSnapshot.docs.forEach((doc) => {
+            productNameById.set(doc.id, doc.data().name);
         });
+
         const topSelling = [...salesQtyByProduct.entries()]
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5)
@@ -217,55 +181,41 @@ router.get('/dashboard', requireAuth, async (req, res) => {
             expiring_count: expiringCount,
             top_selling_products: topSelling
         });
-    } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unexpected dashboard error';
-        res.status(500).json({ error: message });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 });
 
 // Daily report
 router.get('/daily', requireAuth, async (req, res) => {
-    const { date } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    try {
+        const { date } = req.query;
+        const targetDate = (date as string) || new Date().toISOString().split('T')[0];
 
-    const { data: sales, error: salesError } = await supabase
-        .from('sales')
-        .select('total')
-        .eq('sale_date', targetDate);
+        const [sales, purchases, expenses, waste] = await Promise.all([
+            collections.sales.where('sale_date', '==', targetDate).get(),
+            collections.purchases.where('purchase_date', '==', targetDate).get(),
+            collections.expenses.where('expense_date', '==', targetDate).get(),
+            collections.waste.where('waste_date', '==', targetDate).get()
+        ]);
 
-    const { data: purchases, error: purchasesError } = await supabase
-        .from('purchases')
-        .select('total')
-        .eq('purchase_date', targetDate);
+        const totalSales = sales.docs.reduce((acc, doc) => acc + (doc.data().total || 0), 0);
+        const totalPurchases = purchases.docs.reduce((acc, doc) => acc + (doc.data().total || 0), 0);
+        const totalExpenses = expenses.docs.reduce((acc, doc) => acc + (doc.data().amount || 0), 0);
+        const totalWaste = waste.docs.reduce((acc, doc) => acc + (doc.data().cost_value || 0), 0);
 
-    const { data: expenses, error: expensesError } = await supabase
-        .from('expenses')
-        .select('amount')
-        .eq('expense_date', targetDate);
-
-    const { data: waste, error: wasteError } = await supabase
-        .from('waste')
-        .select('cost_value')
-        .eq('waste_date', targetDate);
-
-    if (salesError || purchasesError || expensesError || wasteError) {
-        return res.status(400).json({ error: 'Error fetching report data' });
+        res.json({
+            date: targetDate,
+            total_sales: totalSales,
+            total_purchases: totalPurchases,
+            total_expenses: totalExpenses,
+            total_waste: totalWaste,
+            profit: totalSales - totalPurchases - totalExpenses - totalWaste,
+            net: totalSales - totalPurchases - totalExpenses - totalWaste
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
     }
-
-    const totalSales = sales?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
-    const totalPurchases = purchases?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
-    const totalExpenses = expenses?.reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
-    const totalWaste = waste?.reduce((acc, curr) => acc + (curr.cost_value || 0), 0) || 0;
-
-    res.json({
-        date: targetDate,
-        total_sales: totalSales,
-        total_purchases: totalPurchases,
-        total_expenses: totalExpenses,
-        total_waste: totalWaste,
-        profit: totalSales - totalPurchases - totalExpenses - totalWaste,
-        net: totalSales - totalPurchases - totalExpenses - totalWaste
-    });
 });
 
 // Detailed Daily Report for CSV
@@ -274,80 +224,55 @@ router.get('/daily/details', requireAuth, async (req, res) => {
     const targetDate = date ? (date as string) : new Date().toISOString().split('T')[0];
 
     try {
-        // 1. Fetch all products
-        const { data: products, error: prodError } = await supabase
-            .from('products')
-            .select('id, name, cost_price, price');
+        const [
+            productsSnapshot,
+            pastPurchasesSnapshot,
+            pastSalesSnapshot,
+            pastWasteSnapshot,
+            todayPurchasesSnapshot,
+            todaySalesSnapshot,
+            todayWasteSnapshot,
+            todayExpensesSnapshot
+        ] = await Promise.all([
+            collections.products.get(),
+            collections.purchases.where('purchase_date', '<', targetDate).get(),
+            collections.sales.where('sale_date', '<', targetDate).get(),
+            collections.waste.where('waste_date', '<', targetDate).get(),
+            collections.purchases.where('purchase_date', '==', targetDate).get(),
+            collections.sales.where('sale_date', '==', targetDate).get(),
+            collections.waste.where('waste_date', '==', targetDate).get(),
+            collections.expenses.where('expense_date', '==', targetDate).get()
+        ]);
 
-        if (prodError) throw prodError;
+        const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+        const pastPurchases = pastPurchasesSnapshot.docs.map(doc => doc.data());
+        const pastSales = pastSalesSnapshot.docs.map(doc => doc.data());
+        const pastWaste = pastWasteSnapshot.docs.map(doc => doc.data());
+        const todayPurchases = todayPurchasesSnapshot.docs.map(doc => doc.data());
+        const todaySales = todaySalesSnapshot.docs.map(doc => doc.data());
+        const todayWaste = todayWasteSnapshot.docs.map(doc => doc.data());
+        const todayExpenses = todayExpensesSnapshot.docs.map(doc => doc.data());
 
-        // 2. Fetch past transactions (before targetDate) for Opening Stock
-        // We need to sum quantities by product_id
-        const { data: pastPurchases } = await supabase
-            .from('purchases')
-            .select('product_id, quantity')
-            .lt('purchase_date', targetDate);
+        const totalExpenses = todayExpenses.reduce((sum, exp) => sum + exp.amount, 0);
 
-        const { data: pastSales } = await supabase
-            .from('sales')
-            .select('product_id, quantity')
-            .lt('sale_date', targetDate);
+        const sumByProduct = (items: any[], prodId: string, field: string = 'quantity') =>
+            items.filter(i => i.product_id === prodId).reduce((acc, curr) => acc + (curr[field] || 0), 0);
 
-        const { data: pastWaste } = await supabase
-            .from('waste')
-            .select('product_id, quantity')
-            .lt('waste_date', targetDate);
-
-        // 3. Fetch today's transactions (on targetDate)
-        const { data: todayPurchases } = await supabase
-            .from('purchases')
-            .select('product_id, quantity, total')
-            .eq('purchase_date', targetDate);
-
-        const { data: todaySales } = await supabase
-            .from('sales')
-            .select('product_id, quantity, total')
-            .eq('sale_date', targetDate);
-
-        const { data: todayWaste } = await supabase
-            .from('waste')
-            .select('product_id, quantity')
-            .eq('waste_date', targetDate);
-
-        // 4. Fetch today's expenses (global)
-        const { data: expenses } = await supabase
-            .from('expenses')
-            .select('amount')
-            .eq('expense_date', targetDate);
-
-        const totalExpenses = expenses?.reduce((sum, exp) => sum + exp.amount, 0) || 0;
-
-        // Helper to sum by product
-        const sumByProduct = (items: any[], prodId: number, field: string = 'quantity') =>
-            items?.filter(i => i.product_id === prodId).reduce((acc, curr) => acc + (curr[field] || 0), 0) || 0;
-
-        // 5. Build Report Data
-        const reportData = products?.map(product => {
-            // Opening Stock Calculation
-            const pastPurchasedQty = sumByProduct(pastPurchases || [], product.id);
-            const pastSoldQty = sumByProduct(pastSales || [], product.id);
-            const pastWastedQty = sumByProduct(pastWaste || [], product.id);
+        const reportData = products.map(product => {
+            const pastPurchasedQty = sumByProduct(pastPurchases, product.id);
+            const pastSoldQty = sumByProduct(pastSales, product.id);
+            const pastWastedQty = sumByProduct(pastWaste, product.id);
             const openingStock = pastPurchasedQty - pastSoldQty - pastWastedQty;
 
-            // Today's Activity
-            const purchasedQty = sumByProduct(todayPurchases || [], product.id);
-            const soldQty = sumByProduct(todaySales || [], product.id);
-            const wastedQty = sumByProduct(todayWaste || [], product.id); // Needed for closing stock
+            const purchasedQty = sumByProduct(todayPurchases, product.id);
+            const soldQty = sumByProduct(todaySales, product.id);
+            const wastedQty = sumByProduct(todayWaste, product.id);
 
-            // Closing Stock
             const closingStock = openingStock + purchasedQty - soldQty - wastedQty;
 
-            // Values
-            const purchaseValue = sumByProduct(todayPurchases || [], product.id, 'total');
-            const salesValue = sumByProduct(todaySales || [], product.id, 'total');
+            const purchaseValue = sumByProduct(todayPurchases, product.id, 'total');
+            const salesValue = sumByProduct(todaySales, product.id, 'total');
 
-            // Gross Profit: Sales Value - (Sold Qty * Cost Price)
-            // Note: Using current cost price. Ideally should use FIFO/LIFO but that's complex.
             const costOfGoodsSold = soldQty * product.cost_price;
             const grossProfit = salesValue - costOfGoodsSold;
 
@@ -368,11 +293,11 @@ router.get('/daily/details', requireAuth, async (req, res) => {
         res.json({
             records: reportData,
             totals: {
-                total_purchase_value: reportData?.reduce((sum, r) => sum + r.total_purchase_value, 0) || 0,
-                total_sales_value: reportData?.reduce((sum, r) => sum + r.total_sales_value, 0) || 0,
-                total_gross_profit: reportData?.reduce((sum, r) => sum + r.gross_profit, 0) || 0,
+                total_purchase_value: reportData.reduce((sum, r) => sum + r.total_purchase_value, 0),
+                total_sales_value: reportData.reduce((sum, r) => sum + r.total_sales_value, 0),
+                total_gross_profit: reportData.reduce((sum, r) => sum + r.gross_profit, 0),
                 total_expenses: totalExpenses,
-                net_profit: (reportData?.reduce((sum, r) => sum + r.gross_profit, 0) || 0) - totalExpenses
+                net_profit: reportData.reduce((sum, r) => sum + r.gross_profit, 0) - totalExpenses
             }
         });
 
@@ -394,21 +319,12 @@ router.get('/monthly', requireAuth, async (req, res) => {
             return res.json([row]);
         }
 
-        const { data: months, error: monthError } = await supabase
-            .from('calendar_months')
-            .select('month_start')
-            .order('month_start', { ascending: false })
-            .limit(12);
-
-        let monthStarts: string[] = [];
-        if (!monthError && months && months.length > 0) {
-            monthStarts = months.map((m) => (m as { month_start: string }).month_start);
-        } else {
-            const now = new Date();
-            for (let i = 0; i < 12; i += 1) {
-                const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-                monthStarts.push(ymd(d));
-            }
+        // Default to last 12 months
+        const monthStarts: string[] = [];
+        const now = new Date();
+        for (let i = 0; i < 12; i += 1) {
+            const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+            monthStarts.push(ymd(d));
         }
 
         const rows = await Promise.all(
@@ -420,13 +336,12 @@ router.get('/monthly', requireAuth, async (req, res) => {
         );
 
         return res.json(rows);
-    } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Error fetching monthly report';
-        return res.status(500).json({ error: message });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
     }
 });
 
-// Inventory report with pagination, search, and sort
+// Inventory report
 router.get('/inventory', requireAuth, async (req, res) => {
     try {
         const { page = 1, limit = 10, search = '', sortBy = 'name', sortOrder = 'asc' } = req.query;
@@ -445,9 +360,9 @@ router.get('/inventory', requireAuth, async (req, res) => {
         }
 
         const sortKey = String(sortBy);
-        snapshot.sort((a, b) => {
-            const av = (a as Record<string, unknown>)[sortKey];
-            const bv = (b as Record<string, unknown>)[sortKey];
+        snapshot.sort((a: any, b: any) => {
+            const av = a[sortKey];
+            const bv = b[sortKey];
             if (typeof av === 'number' && typeof bv === 'number') {
                 return ascending ? av - bv : bv - av;
             }
@@ -467,9 +382,8 @@ router.get('/inventory', requireAuth, async (req, res) => {
             limit: limitNum,
             totalPages: Math.ceil(snapshot.length / limitNum)
         });
-    } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Error fetching inventory report';
-        res.status(500).json({ error: message });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -487,9 +401,8 @@ router.get('/expiring', requireAuth, async (req, res) => {
                 item.days_until_expiry <= daysAhead
         );
         res.json(data);
-    } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Error fetching expiring items';
-        res.status(500).json({ error: message });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -499,9 +412,8 @@ router.get('/low-stock', requireAuth, async (req, res) => {
         const snapshot = await buildInventorySnapshot();
         const data = snapshot.filter((item) => item.is_low_stock);
         res.json(data);
-    } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Error fetching low stock items';
-        res.status(500).json({ error: message });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -510,24 +422,20 @@ router.get('/top-selling', requireAuth, async (req, res) => {
     try {
         const { limit } = req.query;
         const limitNum = limit ? parseInt(limit as string, 10) : 10;
-        const [{ data: sales, error: salesError }, { data: products, error: productError }] = await Promise.all([
-            supabase.from('sales').select('product_id, quantity'),
-            supabase.from('products').select('id, name')
+        const [salesSnapshot, productsSnapshot] = await Promise.all([
+            collections.sales.select('product_id', 'quantity').get(),
+            collections.products.select('name').get()
         ]);
 
-        if (salesError || productError) {
-            return res.status(400).json({ error: salesError?.message || productError?.message || 'Error fetching top-selling data' });
-        }
-
-        const qtyByProduct = new Map<number, number>();
-        (sales || []).forEach((row) => {
-            const productId = (row as { product_id: number }).product_id;
-            const quantity = toNumber((row as { quantity?: number }).quantity);
-            qtyByProduct.set(productId, (qtyByProduct.get(productId) || 0) + quantity);
+        const qtyByProduct = new Map<string, number>();
+        salesSnapshot.docs.forEach((doc) => {
+            const row = doc.data();
+            qtyByProduct.set(row.product_id, (qtyByProduct.get(row.product_id) || 0) + toNumber(row.quantity));
         });
-        const productNameById = new Map<number, string>();
-        (products || []).forEach((p) => {
-            productNameById.set((p as { id: number }).id, (p as { name: string }).name);
+
+        const productNameById = new Map<string, string>();
+        productsSnapshot.docs.forEach((doc) => {
+            productNameById.set(doc.id, doc.data().name);
         });
 
         const data = [...qtyByProduct.entries()]
@@ -540,45 +448,46 @@ router.get('/top-selling', requireAuth, async (req, res) => {
             }));
 
         res.json(data);
-    } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Error fetching top-selling products';
-        res.status(500).json({ error: message });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 });
 
 // Waste report
 router.get('/waste', requireAuth, async (req, res) => {
-    const { start_date, end_date } = req.query;
+    try {
+        const { start_date, end_date } = req.query;
 
-    let query = supabase
-        .from('waste')
-        .select(`
-            *,
-            products (
-                name,
-                category
-            )
-        `)
-        .order('waste_date', { ascending: false });
+        let query: FirebaseFirestore.Query = collections.waste.orderBy('waste_date', 'desc');
+        if (start_date) query = query.where('waste_date', '>=', start_date);
+        if (end_date) query = query.where('waste_date', '<=', end_date);
 
-    if (start_date) query = query.gte('waste_date', start_date);
-    if (end_date) query = query.lte('waste_date', end_date);
+        const snapshot = await query.get();
+        const data = await Promise.all(snapshot.docs.map(async (doc) => {
+            const row = { id: doc.id, ...doc.data() as any };
+            if (row.product_id) {
+                const prodDoc = await collections.products.doc(row.product_id).get();
+                if (prodDoc.exists) {
+                    row.products = { name: prodDoc.data()?.name, category: prodDoc.data()?.category };
+                }
+            }
+            return row;
+        }));
 
-    const { data, error } = await query;
-    if (error) return res.status(400).json({ error: error.message });
+        const totalWaste = data.reduce((acc, curr) => acc + (curr.cost_value || 0), 0);
+        const totalQuantity = data.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
 
-    // Calculate totals
-    const totalWaste = data?.reduce((acc, curr) => acc + (curr.cost_value || 0), 0) || 0;
-    const totalQuantity = data?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0;
-
-    res.json({
-        records: data,
-        summary: {
-            total_waste_value: totalWaste,
-            total_quantity: totalQuantity,
-            record_count: data?.length || 0
-        }
-    });
+        res.json({
+            records: data,
+            summary: {
+                total_waste_value: totalWaste,
+                total_quantity: totalQuantity,
+                record_count: data.length
+            }
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
 });
 
 export default router;

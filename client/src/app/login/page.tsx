@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import api from '../../utils/api';
+import { auth } from '../../lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
-import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,7 +22,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
     const [serverError, setServerError] = useState('');
-    const { login } = useAuth(); // Use AuthContext
+    const { login } = useAuth();
     const {
         register,
         handleSubmit,
@@ -34,54 +34,31 @@ export default function LoginPage() {
     const onSubmit = async (data: LoginFormData) => {
         setServerError('');
         try {
-            const res = await api.post('/auth/login', data);
-
-            // Supabase returns { user, session }
-            if (res.data.session) {
+            const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+            if (userCredential.user) {
                 toast.success('Welcome back!');
-                // Use the login function from context to handle state and redirection
-                // Pass the full response data so api.ts can find session.access_token
-                login(res.data);
-            } else if (res.data.token) {
-                // Fallback for legacy/custom backend structure if any
-                login(res.data);
-            } else {
-                throw new Error('Invalid response from server');
+                login(userCredential.user);
             }
-        } catch (err: unknown) {
-            // Use console.warn instead of console.error to avoid Next.js dev error overlay
-            // being triggered for expected authentication failures
+        } catch (err: any) {
             console.warn('Login attempt failed:', err);
 
             let errorMessage = 'Login failed. Please check your credentials.';
-
-            // Handle specific Axios and backend errors
-            if (axios.isAxiosError(err)) {
-                if (err.code === 'ERR_NETWORK') {
-                    errorMessage = 'Unable to reach the server. Check NEXT_PUBLIC_API_URL and backend status.';
-                }
-                const serverMessage = err.response?.data?.error || err.response?.data?.message || err.message;
-                if (serverMessage && err.code !== 'ERR_NETWORK' && !serverMessage.includes('status code 400') && !serverMessage.includes('status code 401')) {
-                    errorMessage = serverMessage;
-                }
-            } else if (err instanceof Error) {
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                errorMessage = 'Invalid email or password.';
+            } else if (err.code === 'auth/network-request-failed') {
+                errorMessage = 'Network error. Please check your connection.';
+            } else if (err.message) {
                 errorMessage = err.message;
-            } else if (typeof err === 'string') {
-                errorMessage = err;
             }
 
             setServerError(errorMessage);
         }
     };
 
-
-
     useEffect(() => {
-        // Check for session expiry query param
         const params = new URLSearchParams(globalThis.window?.location.search);
         if (params.get('reason') === 'session_expired') {
             toast.error('Your session has expired. Please log in again.');
-            // Clean up the URL
             globalThis.window?.history.replaceState({}, '', '/login');
         }
     }, []);

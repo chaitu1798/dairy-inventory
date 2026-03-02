@@ -8,6 +8,7 @@
         "install:all": "npm --prefix server install && npm --prefix client install"
     },
     "dependencies": {
-        "concurrently": "^8.0.1"
+        "concurrently": "^8.0.1",
+        "firebase": "^12.10.0"
     }
 }

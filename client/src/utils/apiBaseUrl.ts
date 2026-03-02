@@ -9,7 +9,7 @@ export const getApiBaseUrl = (): string => {
     if (typeof globalThis.window !== 'undefined') {
         const { hostname } = globalThis.window.location;
         if (LOCALHOSTS.has(hostname)) {
-            return 'http://localhost:3001';
+            return 'http://localhost:3002';
         }
 
         // In deployed environments, prefer same-origin so reverse proxies/rewrites work.
@@ -17,5 +17,5 @@ export const getApiBaseUrl = (): string => {
     }
 
     // SSR fallback
-    return 'http://localhost:3001';
+    return 'http://localhost:3002';
 };

@@ -1,0 +1,56 @@
+type Farm @table {
+  name: String!
+  createdAt: Timestamp!
+  address: String
+  contactPerson: String
+  phoneNumber: String
+}
+
+type Cow @table {
+  farm: Farm!
+  earTagNumber: String!
+  name: String!
+  breed: String!
+  dateOfBirth: Date!
+  createdAt: Timestamp!
+  sire: String
+  dam: String
+  currentWeight: Float
+  lactationNumber: Int
+}
+
+type MilkRecord @table {
+  cow: Cow!
+  milkDate: Date!
+  quantity: Float!
+  createdAt: Timestamp!
+  milkingSession: String
+}
+
+type HealthRecord @table {
+  cow: Cow!
+  recordDate: Date!
+  condition: String!
+  createdAt: Timestamp!
+  diagnosis: String
+  treatment: String
+  veterinarian: String
+}
+
+type FeedType @table {
+  farm: Farm!
+  name: String!
+  unitOfMeasure: String!
+  createdAt: Timestamp!
+  description: String
+  nutritionalValue: String
+}
+
+type FeedInventory @table {
+  farm: Farm!
+  feedType: FeedType!
+  stockLevel: Float!
+  lastUpdated: Timestamp!
+  createdAt: Timestamp!
+  reorderPoint: Float
+}

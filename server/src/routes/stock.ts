@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { supabase } from '../supabase';
+import { collections, storage } from '../firebase';
 import { requireAuth } from '../middleware/auth';
-import { upload } from '../imageUtils'; // Shared multer instance
+import { upload } from '../imageUtils';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
@@ -14,31 +15,30 @@ router.post('/upload', requireAuth, upload.single('image'), async (req, res) => 
 
         const file = req.file;
         const fileExt = file.originalname.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${fileName}`;
+        const fileName = `${Date.now()}_${uuidv4()}.${fileExt}`;
+        const filePath = `product-images/${fileName}`;
 
-        const { data, error } = await supabase
-            .storage
-            .from('product-images')
-            .upload(filePath, file.buffer, {
-                contentType: file.mimetype,
-                upsert: true
-            });
+        const blob = storage.bucket().file(filePath);
+        const blobStream = blob.createWriteStream({
+            metadata: {
+                contentType: file.mimetype
+            }
+        });
 
-        if (error) {
-            console.error('Supabase upload error:', error.message);
-            return res.status(500).json({
-                error: 'Failed to upload image',
-                details: error.message
-            });
-        }
+        blobStream.on('error', (err) => {
+            console.error('Firebase upload error:', err);
+            res.status(500).json({ error: 'Failed to upload image', details: err.message });
+        });
 
-        const { data: { publicUrl } } = supabase
-            .storage
-            .from('product-images')
-            .getPublicUrl(filePath);
+        blobStream.on('finish', async () => {
+            // Make the file public or get a signed URL
+            await blob.makePublic();
+            const publicUrl = `https://storage.googleapis.com/${storage.bucket().name}/${filePath}`;
+            res.json({ url: publicUrl, filePath });
+        });
 
-        res.json({ url: publicUrl, filePath });
+        blobStream.end(file.buffer);
+
     } catch (error) {
         console.error('Upload error:', error instanceof Error ? error.message : error);
         res.status(500).json({
@@ -62,46 +62,31 @@ router.post('/analyze', requireAuth, async (req, res) => {
         const genAI = new GoogleGenerativeAI(key);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        let imageBuffer: ArrayBuffer;
-        let mimeType = 'image/jpeg'; // Default, ideally fetch from metadata if possible or guess
+        let imageBuffer: Buffer | null = null;
+        let mimeType = 'image/jpeg';
 
-        // Method 1: Download from Supabase
         if (filePath) {
-            const { data, error } = await supabase.storage.from('product-images').download(filePath);
-
-            if (!error && data) {
-                imageBuffer = await data.arrayBuffer();
-                mimeType = data.type || mimeType;
-            } else {
-                const { data: signedData } = await supabase
-                    .storage
-                    .from('product-images')
-                    .createSignedUrl(filePath, 60);
-
-                if (signedData?.signedUrl) {
-                    const signedResp = await fetch(signedData.signedUrl);
-                    if (signedResp.ok) {
-                        imageBuffer = await signedResp.arrayBuffer();
-                        mimeType = signedResp.headers.get('content-type') || mimeType;
-                    }
-                }
+            const file = storage.bucket().file(filePath);
+            const [exists] = await file.exists();
+            if (exists) {
+                const [buffer] = await file.download();
+                imageBuffer = buffer;
+                const [metadata] = await file.getMetadata();
+                mimeType = metadata.contentType || mimeType;
             }
         }
 
-        if (!imageBuffer! && imageUrl) {
+        if (!imageBuffer && imageUrl) {
             const imageResp = await fetch(imageUrl);
             if (imageResp.ok) {
-                imageBuffer = await imageResp.arrayBuffer();
+                imageBuffer = Buffer.from(await imageResp.arrayBuffer());
                 mimeType = imageResp.headers.get('content-type') || mimeType;
-            } else {
-                console.error(`Failed to fetch image from URL: ${imageResp.statusText}`);
             }
         }
 
-        if (!imageBuffer!) {
-            throw new Error("Failed to retrieve image data from Storage, Signed URL, or Public URL. Check bucket permissions.");
+        if (!imageBuffer) {
+            throw new Error("Failed to retrieve image data from Storage or Public URL.");
         }
-
 
         const prompt = `Analyze this image of a product or bill/invoice. 
         Extract the following details in JSON format:
@@ -116,7 +101,7 @@ router.post('/analyze', requireAuth, async (req, res) => {
             prompt,
             {
                 inlineData: {
-                    data: Buffer.from(imageBuffer).toString('base64'),
+                    data: imageBuffer.toString('base64'),
                     mimeType: mimeType
                 }
             }
@@ -124,7 +109,6 @@ router.post('/analyze', requireAuth, async (req, res) => {
 
         const response = await result.response;
         const text = response.text();
-
         const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
         try {
@@ -141,7 +125,6 @@ router.post('/analyze', requireAuth, async (req, res) => {
     }
 });
 
-// Update stock based on image capture
 router.post('/update', requireAuth, async (req, res) => {
     const { productId, quantity, actionType, imageUrl } = req.body;
 
@@ -150,64 +133,43 @@ router.post('/update', requireAuth, async (req, res) => {
     }
 
     try {
-        // 1. Fetch product details (cost price)
-        const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('cost_price')
-            .eq('id', productId)
-            .single();
-
-        if (productError || !product) {
+        const productDoc = await collections.products.doc(productId).get();
+        if (!productDoc.exists) {
             return res.status(404).json({ error: 'Product not found' });
         }
 
-        const costPrice = product.cost_price;
+        const costPrice = productDoc.data()?.cost_price || 0;
         const qty = parseFloat(quantity);
 
-        // 2. Perform Stock Action
         if (actionType === 'IN') {
-            // Add to Purchases
-            const { error: purchaseError } = await supabase
-                .from('purchases')
-                .insert([{
-                    product_id: productId,
-                    quantity: qty,
-                    price: costPrice,
-                    purchase_date: new Date().toISOString().split('T')[0] // Today
-                }]);
-
-            if (purchaseError) throw purchaseError;
-
+            await collections.purchases.add({
+                product_id: productId,
+                quantity: qty,
+                price: costPrice,
+                total: qty * costPrice,
+                purchase_date: new Date().toISOString().split('T')[0]
+            });
         } else if (actionType === 'OUT') {
-            // Add to Waste (using 'other' reason for manual adjustment)
-            const { error: wasteError } = await supabase
-                .from('waste')
-                .insert([{
-                    product_id: productId,
-                    quantity: qty,
-                    reason: 'other',
-                    cost_value: costPrice * qty,
-                    waste_date: new Date().toISOString().split('T')[0],
-                    notes: 'Image Capture Stock Adjustment'
-                }]);
-
-            if (wasteError) throw wasteError;
+            await collections.waste.add({
+                product_id: productId,
+                quantity: qty,
+                reason: 'other',
+                cost_value: costPrice * qty,
+                waste_date: new Date().toISOString().split('T')[0],
+                notes: 'Image Capture Stock Adjustment'
+            });
         } else {
             return res.status(400).json({ error: 'Invalid action type' });
         }
 
-        // 3. Log to stock_logs
-        const { error: logError } = await supabase
-            .from('stock_logs')
-            .insert([{
-                product_id: productId,
-                quantity: qty,
-                action_type: actionType,
-                image_url: imageUrl,
-                updated_by: 'system' // Placeholder, could be user ID if auth was passed
-            }]);
-
-        if (logError) console.error('Error logging stock update:', logError);
+        await collections.stock_logs.add({
+            product_id: productId,
+            quantity: qty,
+            action_type: actionType,
+            image_url: imageUrl,
+            updated_by: 'system',
+            created_at: new Date().toISOString()
+        });
 
         res.json({ message: 'Stock updated successfully' });
 

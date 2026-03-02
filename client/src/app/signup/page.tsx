@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import api from '../../utils/api';
+import { auth } from '../../lib/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -33,15 +34,25 @@ export default function SignupPage() {
     const onSubmit = async (data: SignupFormData) => {
         setServerError('');
         try {
-            const res = await api.post('/auth/signup', data);
-            if (res.data.user) {
-                toast.success('Account created successfully! Please sign in.');
-                router.push('/login');
+            const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+            if (userCredential.user) {
+                toast.success('Account created successfully!');
+                router.push('/dashboard');
             }
-        } catch (err) {
+        } catch (err: any) {
             console.warn('Signup error:', err);
-            const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
-            const errorMessage = axiosError.response?.data?.error || axiosError.message || 'Signup failed. Please try again.';
+            let errorMessage = 'Signup failed. Please try again.';
+
+            if (err.code === 'auth/email-already-in-use') {
+                errorMessage = 'This email is already registered.';
+            } else if (err.code === 'auth/weak-password') {
+                errorMessage = 'Password is too weak.';
+            } else if (err.code === 'auth/network-request-failed') {
+                errorMessage = 'Network error. Please check your connection.';
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+
             setServerError(errorMessage);
         }
     };
@@ -81,7 +92,7 @@ export default function SignupPage() {
                         />
                         <Button
                             type="submit"
-                            className="w-full"
+                            className="w-full bg-sky-500 hover:bg-sky-600"
                             size="lg"
                             disabled={isSubmitting}
                         >

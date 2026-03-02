@@ -1,3 +1,18 @@
 node_modules
 **/.env
 dist
+
+# Firebase secrets - never commit these
+*firebase-adminsdk*.json
+server/firebase-service-account.json
+firebase-debug.log
+
+# Next.js
+**/.next
+
+# Build artifacts
+**/build
+
+# Local env files
+**/.env.local
+**/.env*.local

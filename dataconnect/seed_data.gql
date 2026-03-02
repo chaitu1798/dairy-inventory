@@ -1,0 +1,80 @@
+mutation CreateDemoData @transaction @auth(level: USER, insecureReason: "Seed data mutation, safe for any logged in user to execute.") {
+  farm1: farm_insert(data: {
+    name: "Green Valley Farm",
+    address: "123 Green Valley Rd, Farmland, US",
+    contactPerson: "Alice Smith",
+    phoneNumber: "555-123-4567",
+    createdAt: "2023-01-01T10:00:00Z"
+  })
+  farm2: farm_insert(data: {
+    name: "Oak Ridge Dairy",
+    address: "456 Oak Ridge Ln, Dairyville, US",
+    contactPerson: "Bob Johnson",
+    phoneNumber: "555-987-6543",
+    createdAt: "2023-01-05T11:30:00Z"
+  })
+  feedType1: feedType_insert(data: {
+    farm: {id_expr: "farm1.id"},
+    name: "Alfalfa Hay",
+    unitOfMeasure: "kg",
+    description: "High-quality alfalfa for dairy cows.",
+    nutritionalValue: "High protein, high fiber",
+    createdAt: "2023-01-02T09:00:00Z"
+  })
+  feedType2: feedType_insert(data: {
+    farm: {id_expr: "farm1.id"},
+    name: "Corn Silage",
+    unitOfMeasure: "kg",
+    description: "Fermented corn for energy.",
+    nutritionalValue: "High energy",
+    createdAt: "2023-01-03T09:00:00Z"
+  })
+  cow1: cow_insert(data: {
+    farm: {id_expr: "farm1.id"},
+    earTagNumber: "GVF001",
+    name: "Daisy",
+    breed: "Holstein",
+    dateOfBirth: "2020-03-15",
+    createdAt: "2023-01-06T08:00:00Z",
+    sire: "Bull-A",
+    dam: "Cow-X",
+    currentWeight: 650.5,
+    lactationNumber: 2
+  })
+  cow2: cow_insert(data: {
+    farm: {id_expr: "farm1.id"},
+    earTagNumber: "GVF002",
+    name: "Betsy",
+    breed: "Jersey",
+    dateOfBirth: "2021-06-20",
+    createdAt: "2023-01-07T09:00:00Z",
+    sire: "Bull-B",
+    dam: "Cow-Y",
+    currentWeight: 450.0,
+    lactationNumber: 1
+  })
+  feedInventory1: feedInventory_insert(data: {
+    farm: {id_expr: "farm1.id"},
+    feedType: {id_expr: "feedType1.id"},
+    stockLevel: 1000.0,
+    lastUpdated: "2023-11-01T14:00:00Z",
+    createdAt: "2023-01-08T10:00:00Z",
+    reorderPoint: 200.0
+  })
+  milkRecord1: milkRecord_insert(data: {
+    cow: {id_expr: "cow1.id"},
+    milkDate: "2023-11-01",
+    quantity: 25.3,
+    milkingSession: "Morning",
+    createdAt: "2023-11-01T07:00:00Z"
+  })
+  healthRecord1: healthRecord_insert(data: {
+    cow: {id_expr: "cow1.id"},
+    recordDate: "2023-10-15",
+    condition: "Healthy",
+    diagnosis: "Routine check-up",
+    treatment: "None",
+    veterinarian: "Dr. Evans",
+    createdAt: "2023-10-15T10:00:00Z"
+  })
+}

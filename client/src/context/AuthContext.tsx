@@ -2,22 +2,17 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getApiBaseUrl } from '../utils/apiBaseUrl';
+import { auth } from '../lib/firebase';
+import { onAuthStateChanged, signOut, User, getIdToken } from 'firebase/auth';
 
-interface AuthUser {
-    id: string | number;
-    email: string;
+interface AuthUser extends User {
     role?: string;
     access_token?: string;
-    session?: {
-        access_token: string;
-    };
-    [key: string]: unknown;
 }
 
 interface AuthContextType {
     readonly user: AuthUser | null;
-    readonly login: (userData: AuthUser) => void;
+    readonly login: (userData: any) => void;
     readonly logout: (reason?: string) => Promise<void>;
     readonly loading: boolean;
 }
@@ -34,23 +29,44 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
-    const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                try {
+                    const token = await getIdToken(firebaseUser, true);
+                    const authUser: AuthUser = {
+                        ...firebaseUser,
+                        access_token: token
+                    } as AuthUser;
+
+                    setUser(authUser);
+                    // Maintain legacy storage for API interceptor compatibility (api.ts)
+                    localStorage.setItem('dairy_user', JSON.stringify({
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        access_token: token
+                    }));
+                } catch (error) {
+                    console.error('Error getting Firebase token:', error);
+                    setUser(null);
+                    localStorage.removeItem('dairy_user');
+                }
+            } else {
+                setUser(null);
+                localStorage.removeItem('dairy_user');
+                localStorage.removeItem('dairy_login_timestamp');
+            }
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     const logout = useCallback(async (reason?: string) => {
         try {
-            const token = user?.session?.access_token || user?.access_token;
-            if (token) {
-                const baseUrl = getApiBaseUrl();
-                await fetch(`${baseUrl}/auth/logout`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-            }
+            await signOut(auth);
         } catch (e) {
-            console.warn('Logout API error', e);
+            console.warn('Logout error', e);
         }
 
         setUser(null);
@@ -62,44 +78,12 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
         } else {
             router.push('/login');
         }
-    }, [user, router]);
+    }, [router]);
 
-    const checkSessionExpiry = useCallback(() => {
-        const timestamp = localStorage.getItem('dairy_login_timestamp');
-        if (timestamp) {
-            const timePassed = Date.now() - Number.parseInt(timestamp, 10);
-            if (timePassed > SESSION_DURATION) {
-                console.warn('Session expired. Logging out.');
-                logout('session_expired');
-            }
-        }
-    }, [logout, SESSION_DURATION]);
-
-    useEffect(() => {
-        const storedUser = localStorage.getItem('dairy_user');
-        if (storedUser) {
-            try {
-                // eslint-disable-next-line react-hooks/set-state-in-effect
-                setUser(JSON.parse(storedUser));
-                checkSessionExpiry();
-            } catch (e) {
-                console.warn('Error parsing stored user', e);
-                localStorage.removeItem('dairy_user');
-            }
-        }
-        setLoading(false);
-
-        // Check session expiry on focus
-        const handleFocus = () => checkSessionExpiry();
-        globalThis.window?.addEventListener('focus', handleFocus);
-        return () => globalThis.window?.removeEventListener('focus', handleFocus);
-    }, [checkSessionExpiry]);
-
-    const login = useCallback((userData: AuthUser) => {
-        setUser(userData);
-        localStorage.setItem('dairy_user', JSON.stringify(userData));
-        localStorage.setItem('dairy_login_timestamp', Date.now().toString());
-        globalThis.window.location.href = '/dashboard';
+    const login = useCallback((userData: any) => {
+        // This is now mostly handled by onAuthStateChanged after the actual login call
+        // But we can use it to force a redirect if needed
+        router.push('/dashboard');
     }, [router]);
 
     const contextValue = useMemo(() => ({

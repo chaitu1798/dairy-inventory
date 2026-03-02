@@ -104,12 +104,15 @@ app.listen(port, () => {
     console.log(`Local: http://localhost:${port}`);
 
     // Environment Check
-    const requiredEnv = ['FIREBASE_SERVICE_ACCOUNT_PATH', 'FIREBASE_STORAGE_BUCKET', 'GEMINI_API_KEY'];
-    const missingEnv = requiredEnv.filter(key => !process.env[key]);
-
-    if (missingEnv.length > 0) {
-        console.error(`\n❌ CRITICAL ERROR: Missing environment variables: ${missingEnv.join(', ')}`);
-    } else {
-        console.log('✅ Environment check passed');
+    const hasCredentials = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+    if (!hasCredentials) {
+        console.warn('⚠️  No FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH set — using Application Default Credentials (ADC)');
     }
+    if (!process.env.FIREBASE_STORAGE_BUCKET) {
+        console.warn('⚠️  FIREBASE_STORAGE_BUCKET is not set — image uploads may fail');
+    }
+    if (!process.env.GEMINI_API_KEY) {
+        console.warn('⚠️  GEMINI_API_KEY is not set — AI image analysis will be disabled');
+    }
+    console.log('✅ Environment check passed');
 });

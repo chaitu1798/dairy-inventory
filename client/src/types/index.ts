@@ -1,12 +1,20 @@
+export interface Category {
+    id: string;
+    name: string;
+}
+
 export interface Product {
     id: number;
     name: string;
-    category?: string;
-    type?: string;
+    categoryId: string;
+    categoryName: string;
+    category?: string; // Legacy
+    type?: string;     // Legacy
     unit: string;
     price: number;
     cost_price?: number;
     min_stock?: number;
+    low_stock_threshold?: number;
     track_expiry?: boolean;
     expiry_date?: string | null;
     expiry_days?: number;

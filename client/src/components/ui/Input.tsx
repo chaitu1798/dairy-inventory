@@ -11,26 +11,31 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
     ({ label, error, className, helperText, startAdornment, ...props }, ref) => {
+        const id = props.id || props.name;
+        
         return (
-            <div className="w-full space-y-2">
+            <div className="w-full space-y-1.5 group">
                 <label
-                    htmlFor={props.id || props.name}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    htmlFor={id}
+                    className="text-[13px] font-semibold text-slate-700 ml-1 transition-colors group-focus-within:text-primary"
                 >
                     {label}
                 </label>
                 <div className="relative">
                     {startAdornment && (
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground flex items-center pointer-events-none">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors flex items-center pointer-events-none">
                             {startAdornment}
                         </div>
                     )}
                     <input
                         ref={ref}
+                        id={id}
                         className={cn(
-                            "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
-                            startAdornment && "pl-9",
-                            error && "border-destructive focus-visible:ring-destructive",
+                            "flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm transition-all duration-200",
+                            "placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary",
+                            "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-50",
+                            startAdornment && "pl-11",
+                            error && "border-destructive focus:ring-destructive/5 focus:border-destructive",
                             className
                         )}
                         aria-invalid={error ? 'true' : 'false'}
@@ -47,7 +52,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                 {helperText && !error && (
                     <p
                         id={`${props.name}-description`}
-                        className="text-xs text-muted-foreground"
+                        className="text-[11px] text-slate-500 ml-1 font-medium"
                     >
                         {helperText}
                     </p>
@@ -55,7 +60,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                 {error && (
                     <p
                         id={`${props.name}-error`}
-                        className="text-sm font-medium text-destructive animate-slide-down"
+                        className="text-[12px] font-medium text-destructive ml-1 fade-up"
                         role="alert"
                     >
                         {error.message}

@@ -12,7 +12,7 @@ interface AuthUser extends User {
 
 interface AuthContextType {
     readonly user: AuthUser | null;
-    readonly login: (userData: any) => void;
+    readonly login: () => void;
     readonly logout: (reason?: string) => Promise<void>;
     readonly loading: boolean;
 }
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
         }
     }, [router]);
 
-    const login = useCallback((userData: any) => {
+    const login = useCallback(() => {
         // This is now mostly handled by onAuthStateChanged after the actual login call
         // But we can use it to force a redirect if needed
         router.push('/dashboard');

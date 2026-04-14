@@ -1,8 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../../utils/api';
-import { Plus, Trash2, Edit2, ChevronLeft, ChevronRight, Search, Calendar } from 'lucide-react';
+import { 
+    PlusCircle,
+    Trash2, 
+    Edit2, 
+    ChevronLeft, 
+    ChevronRight, 
+    Calendar,
+    ShoppingCart,
+    ArrowUpRight,
+    Filter,
+    ArrowRight,
+    User
+} from 'lucide-react';
 import { Product, Customer, Sale } from '../../types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,13 +23,23 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
+import { 
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import ConfirmationDialog from '../../components/ui/ConfirmationDialog';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
+import { useFilteredProducts } from '../../hooks/useFilteredProducts';
+import { CATEGORIES } from '../../constants/categories';
 
 const salesSchema = z.object({
+    categoryId: z.string().min(1, 'Category is required'),
     product_id: z.string().min(1, 'Product is required'),
     customer_id: z.string().optional(),
     quantity: z.coerce.number().min(0.01, 'Quantity must be greater than 0'),
@@ -37,7 +59,9 @@ const salesSchema = z.object({
 type SalesFormData = z.infer<typeof salesSchema>;
 
 export default function SalesPage() {
-    const [products, setProducts] = useState<Product[]>([]);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+    const { products: filteredProducts, loading: productsLoading } = useFilteredProducts(selectedCategoryId);
+    const [allProducts, setAllProducts] = useState<Product[]>([]); 
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [sales, setSales] = useState<Sale[]>([]);
     const [loading, setLoading] = useState(true);
@@ -66,52 +90,48 @@ export default function SalesPage() {
         setValue,
         formState: { errors, isSubmitting },
     } = useForm<SalesFormData>({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(salesSchema) as any,
         defaultValues: {
             sale_date: new Date().toISOString().split('T')[0],
             status: 'paid',
             customer_id: '',
-            due_date: ''
+            due_date: '',
+            categoryId: ''
         }
     });
 
     const status = watch('status');
+    const watchedCategoryId = watch('categoryId');
 
-    useEffect(() => {
-        fetchProducts();
-        fetchCustomers();
-    }, []);
-
-    useEffect(() => {
-        fetchSales(currentPage);
-    }, [dateRange, currentPage]);
-
-    const fetchProducts = async () => {
+    const fetchAllProducts = useCallback(async () => {
         try {
             const res = await api.get('/products?limit=1000');
             if (res.data && res.data.data) {
-                setProducts(res.data.data);
+                setAllProducts(res.data.data);
             } else if (Array.isArray(res.data)) {
-                setProducts(res.data);
+                setAllProducts(res.data);
             } else {
-                setProducts([]);
+                setAllProducts([]);
             }
         } catch (error) {
             console.warn('Error fetching products:', error);
-            toast.error('Failed to load products');
+            toast.error('Failed to load products list for sales');
+            setAllProducts([]);
         }
-    };
+    }, []);
 
-    const fetchCustomers = async () => {
+    const fetchCustomers = useCallback(async () => {
         try {
             const res = await api.get('/customers');
             setCustomers(res.data);
         } catch (error) {
             console.warn('Error fetching customers:', error);
+            toast.error('Failed to load customers for sales');
         }
-    };
+    }, []);
 
-    const fetchSales = async (page = currentPage) => {
+    const fetchSales = useCallback(async (page = currentPage) => {
         try {
             setLoading(true);
             const res = await api.get(`/sales?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&page=${page}&limit=${ITEMS_PER_PAGE}`);
@@ -128,7 +148,22 @@ export default function SalesPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentPage, dateRange.startDate, dateRange.endDate]);
+
+    useEffect(() => {
+        fetchAllProducts();
+        fetchCustomers();
+    }, [fetchAllProducts, fetchCustomers]);
+
+    useEffect(() => {
+        if (watchedCategoryId) {
+            setSelectedCategoryId(watchedCategoryId);
+        }
+    }, [watchedCategoryId]);
+
+    useEffect(() => {
+        fetchSales(currentPage);
+    }, [dateRange, currentPage, fetchSales]);
 
     const onSubmit = async (data: SalesFormData) => {
         try {
@@ -147,6 +182,7 @@ export default function SalesPage() {
             }
 
             reset({
+                categoryId: '',
                 product_id: '',
                 customer_id: '',
                 quantity: 0,
@@ -157,17 +193,26 @@ export default function SalesPage() {
 
             setIsEditing(false);
             setEditId(null);
+            setSelectedCategoryId('');
             fetchSales();
-        } catch (error) {
+        } catch (error: unknown) {
             console.warn('Error recording sale:', error);
-            toast.error((error as any).serverMessage || 'Error recording sale');
+            const serverMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            toast.error(serverMessage || 'Error recording sale');
         }
     };
 
     const handleEdit = (sale: Sale) => {
+        const product = allProducts.find((p: Product) => String(p.id) === String(sale.product_id));
+        const catId = product?.categoryId || product?.category || 'products';
+        
+        setSelectedCategoryId(catId);
+        setValue('categoryId', catId);
+        
         setIsEditing(true);
         setEditId(sale.id);
         reset({
+            categoryId: catId,
             product_id: String(sale.product_id),
             customer_id: sale.customer_id ? String(sale.customer_id) : '',
             quantity: sale.quantity,
@@ -175,13 +220,15 @@ export default function SalesPage() {
             status: sale.status || 'paid',
             due_date: sale.due_date ? sale.due_date.split('T')[0] : ''
         });
-        globalThis.window?.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleCancelEdit = () => {
         setIsEditing(false);
         setEditId(null);
+        setSelectedCategoryId('');
         reset({
+            categoryId: '',
             product_id: '',
             customer_id: '',
             quantity: 0,
@@ -213,34 +260,79 @@ export default function SalesPage() {
     };
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sales Management</h1>
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-[1800px] mx-auto">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 font-heading">Sales Ledger</h1>
+                    <p className="text-slate-500 font-medium whitespace-nowrap">Manage customer transactions and payment tracking.</p>
+                </div>
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                     <Card isGlass={false} className="border-none bg-emerald-50 py-2 px-4 flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-white text-emerald-600 shadow-sm">
+                            <ArrowUpRight className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest leading-none mb-1">Total Sales</p>
+                            <h4 className="text-lg font-black text-slate-900 leading-none">₹{sales.reduce((acc, sale) => acc + (sale.quantity * sale.price), 0).toLocaleString()}</h4>
+                        </div>
+                    </Card>
+                </div>
+            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Form Section */}
-                <div className="lg:col-span-1">
-                    <Card className="sticky top-6">
-                        <CardHeader>
-                            <CardTitle>{isEditing ? 'Edit Sale' : 'Record New Sale'}</CardTitle>
+                <div className="lg:col-span-4">
+                    <Card className="sticky top-24 border-none shadow-premium bg-white/70 backdrop-blur-xl">
+                        <CardHeader className="pb-4">
+                            <CardTitle className="text-xl flex items-center">
+                                <PlusCircle className="w-5 h-5 mr-2 text-primary" />
+                                {isEditing ? 'Edit Transaction' : 'Record New Sale'}
+                            </CardTitle>
                             <CardDescription>
-                                {isEditing ? 'Update the sale details below.' : 'Enter new sale details to record a transaction.'}
+                                {isEditing ? 'Modify transaction details' : 'Enter sales data for your ledger'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                                 <Select
-                                    label="Product"
-                                    {...register('product_id')}
-                                    error={errors.product_id}
-                                    options={products.map(p => ({
-                                        value: String(p.id),
-                                        label: `${p.name} (${p.unit})`
-                                    }))}
-                                    placeholder="Select Product"
+                                    label="Product Category"
+                                    {...register('categoryId')}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setSelectedCategoryId(val);
+                                        setValue('categoryId', val);
+                                        setValue('product_id', ''); // Reset product
+                                    }}
+                                    error={errors.categoryId}
+                                    options={CATEGORIES.map(c => ({ value: c.id, label: c.name }))}
+                                    placeholder="Choose category first"
+                                    className="bg-white"
                                 />
 
                                 <Select
-                                    label="Customer (Optional)"
+                                    label="Select Product"
+                                    {...register('product_id')}
+                                    error={errors.product_id}
+                                    disabled={!selectedCategoryId || productsLoading}
+                                    options={filteredProducts.map(p => ({
+                                        value: String(p.id),
+                                        label: `${p.name} (${p.unit})`
+                                    }))}
+                                    placeholder={
+                                        productsLoading 
+                                            ? "Loading products..." 
+                                            : !selectedCategoryId 
+                                                ? "Select category to see products" 
+                                                : filteredProducts.length === 0 
+                                                    ? "No products in this category" 
+                                                    : "Select product"
+                                    }
+                                    className="bg-white"
+                                />
+
+                                <Select
+                                    label="Customer Account"
                                     {...register('customer_id')}
                                     error={errors.customer_id}
                                     options={customers.map(c => ({
@@ -248,6 +340,7 @@ export default function SalesPage() {
                                         label: c.name
                                     }))}
                                     placeholder="Walk-in Customer"
+                                    className="bg-white"
                                 />
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -258,13 +351,15 @@ export default function SalesPage() {
                                         {...register('quantity')}
                                         error={errors.quantity}
                                         placeholder="0.00"
+                                        className="bg-white"
                                     />
 
                                     <Input
-                                        label="Date"
+                                        label="Sale Date"
                                         type="date"
                                         {...register('sale_date')}
                                         error={errors.sale_date}
+                                        className="bg-white"
                                     />
                                 </div>
 
@@ -273,35 +368,39 @@ export default function SalesPage() {
                                     {...register('status')}
                                     error={errors.status}
                                     options={[
-                                        { value: 'paid', label: 'Paid (Cash/UPI)' },
-                                        { value: 'pending', label: 'Pending (Credit)' }
+                                        { value: 'paid', label: 'Paid Immediately' },
+                                        { value: 'pending', label: 'Pending / Credit' }
                                     ]}
+                                    className="bg-white"
                                 />
 
                                 {status === 'pending' && (
-                                    <div className="animate-fade-in">
+                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                                         <Input
-                                            label="Due Date"
+                                            label="Credit Due Date"
                                             type="date"
                                             {...register('due_date')}
                                             error={errors.due_date}
+                                            className="bg-white"
                                         />
                                     </div>
                                 )}
 
-                                <div className="flex gap-2 pt-2">
+                                <div className="flex gap-3 pt-2">
                                     <Button
                                         type="submit"
-                                        className="flex-1 bg-sky-500 hover:bg-sky-600"
+                                        variant="gradient"
+                                        className="flex-1 h-11 rounded-xl font-bold shadow-lg shadow-blue-500/20"
                                         disabled={isSubmitting}
                                     >
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        {isEditing ? 'Update Sale' : 'Record Sale'}
+                                        {isEditing ? 'Update Sale' : 'Commit Transaction'}
+                                        {!isSubmitting && <ArrowRight className="w-4 h-4 ml-2" />}
                                     </Button>
                                     {isEditing && (
                                         <Button
                                             type="button"
                                             variant="outline"
+                                            className="h-11 rounded-xl font-bold"
                                             onClick={handleCancelEdit}
                                         >
                                             Cancel
@@ -314,206 +413,164 @@ export default function SalesPage() {
                 </div>
 
                 {/* List Section */}
-                <div className="lg:col-span-2 space-y-4">
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                                <CardTitle>Recent Sales</CardTitle>
-                                <div className="flex items-center gap-2 w-full md:w-auto p-1 bg-muted rounded-md">
-                                    <div className="flex items-center px-2">
-                                        <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
-                                        <input
-                                            type="date"
-                                            value={dateRange.startDate}
-                                            onChange={(e) => {
-                                                setDateRange({ ...dateRange, startDate: e.target.value });
-                                                setCurrentPage(1);
-                                            }}
-                                            className="bg-transparent border-none text-sm focus:ring-0 w-32"
-                                            aria-label="Start Date Filter"
-                                        />
-                                    </div>
-                                    <span className="text-muted-foreground">-</span>
-                                    <div className="flex items-center px-2">
-                                        <input
-                                            type="date"
-                                            value={dateRange.endDate}
-                                            onChange={(e) => {
-                                                setDateRange({ ...dateRange, endDate: e.target.value });
-                                                setCurrentPage(1);
-                                            }}
-                                            className="bg-transparent border-none text-sm focus:ring-0 w-32"
-                                            aria-label="End Date Filter"
-                                        />
-                                    </div>
-                                </div>
+                <div className="lg:col-span-8 space-y-6">
+                    {/* Filter & Advanced Search */}
+                    <div className="flex flex-col md:flex-row gap-4 items-center justify-between p-4 bg-white/70 backdrop-blur-md rounded-3xl shadow-premium border border-slate-100">
+                        <div className="flex items-center gap-3 w-full md:w-auto p-1 bg-slate-50 rounded-2xl border border-slate-100/50">
+                            <div className="flex items-center px-3 border-r border-slate-200/50">
+                                <Calendar className="h-3.5 w-3.5 text-slate-400 mr-2" />
+                                <input
+                                    type="date"
+                                    value={dateRange.startDate}
+                                    onChange={(e) => {
+                                        setDateRange({ ...dateRange, startDate: e.target.value });
+                                        setCurrentPage(1);
+                                    }}
+                                    className="bg-transparent border-none text-[11px] font-bold text-slate-600 outline-none w-24"
+                                    aria-label="Start Date"
+                                />
                             </div>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            {loading ? (
-                                <div className="p-8 text-center text-muted-foreground">Loading sales records...</div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {/* Mobile View: Card Stack */}
-                                    <div className="md:hidden divide-y divide-gray-100">
-                                        {sales.map((sale) => (
-                                            <div key={sale.id} className="p-4 space-y-3">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="text-sm text-gray-500 mb-1">{new Date(sale.sale_date).toLocaleDateString()}</div>
-                                                        <h3 className="font-semibold text-gray-900">{sale.products?.name}</h3>
-                                                        <div className="text-sm text-muted-foreground">
-                                                            {sale.customers?.name || <span className="italic">Walk-in</span>}
-                                                        </div>
-                                                    </div>
-                                                    <Badge variant={
-                                                        sale.status === 'paid' ? 'success' :
-                                                            sale.status === 'overdue' ? 'destructive' : 'warning'
-                                                    } className="uppercase text-[10px]">
-                                                        {sale.status || 'PAID'}
-                                                    </Badge>
-                                                </div>
-
-                                                <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
-                                                    <div>
-                                                        <p className="text-xs text-gray-500 uppercase font-semibold">Qty</p>
-                                                        <p className="font-medium">{sale.quantity} {sale.products?.unit}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xs text-gray-500 uppercase font-semibold">Amount</p>
-                                                        <p className="font-bold text-emerald-600">₹{(sale.quantity * sale.price).toFixed(2)}</p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-8 text-primary"
-                                                        onClick={() => handleEdit(sale)}
-                                                    >
-                                                        <Edit2 className="w-4 h-4 mr-2" /> Edit
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-8 text-destructive"
-                                                        onClick={() => handleDeleteClick(sale.id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4 mr-2" /> Delete
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Desktop View: Table */}
-                                    <div className="hidden md:block overflow-x-auto">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Date</TableHead>
-                                                    <TableHead>Customer</TableHead>
-                                                    <TableHead>Product</TableHead>
-                                                    <TableHead>Amount</TableHead>
-                                                    <TableHead>Status</TableHead>
-                                                    <TableHead className="text-right">Actions</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {sales.map((sale) => (
-                                                    <TableRow key={sale.id}>
-                                                        <TableCell className="text-muted-foreground text-sm">
-                                                            {new Date(sale.sale_date).toLocaleDateString()}
-                                                        </TableCell>
-                                                        <TableCell className="font-medium">
-                                                            {sale.customers?.name || <span className="text-muted-foreground italic">Walk-in</span>}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div>{sale.products?.name}</div>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {sale.quantity} {sale.products?.unit}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell className="font-bold text-emerald-600">
-                                                            ₹{(sale.quantity * sale.price).toFixed(2)}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge variant={
-                                                                sale.status === 'paid' ? 'success' :
-                                                                    sale.status === 'overdue' ? 'destructive' : 'warning'
-                                                            } className="uppercase text-[10px]">
-                                                                {sale.status || 'PAID'}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            <div className="flex justify-end gap-1">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-primary"
-                                                                    onClick={() => handleEdit(sale)}
-                                                                    aria-label="Edit sale"
-                                                                >
-                                                                    <Edit2 className="w-4 h-4" />
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-destructive"
-                                                                    onClick={() => handleDeleteClick(sale.id)}
-                                                                    aria-label="Delete sale"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </Button>
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                                {sales.length === 0 && (
-                                                    <TableRow>
-                                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                            No sales found for the selected period.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Pagination Controls */}
-                    {totalPages > 1 && (
-                        <div className="flex justify-between items-center bg-card p-4 rounded-lg border shadow-sm">
-                            <span className="text-sm text-muted-foreground">
-                                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} entries
-                            </span>
-                            <div className="flex space-x-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                    disabled={currentPage === 1}
-                                >
-                                    <ChevronLeft className="w-4 h-4" />
-                                </Button>
-                                <span className="flex items-center px-4 font-medium text-sm border rounded-md bg-muted/50">
-                                    {currentPage} / {totalPages}
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                    disabled={currentPage === totalPages}
-                                >
-                                    <ChevronRight className="w-4 h-4" />
-                                </Button>
+                            <span className="text-[10px] font-black text-slate-300 px-1">TO</span>
+                            <div className="flex items-center px-3">
+                                <input
+                                    type="date"
+                                    value={dateRange.endDate}
+                                    onChange={(e) => {
+                                        setDateRange({ ...dateRange, endDate: e.target.value });
+                                        setCurrentPage(1);
+                                    }}
+                                    className="bg-transparent border-none text-[11px] font-bold text-slate-600 outline-none w-24"
+                                    aria-label="End Date"
+                                />
                             </div>
                         </div>
-                    )}
+                        
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="h-9 px-4 rounded-xl border-slate-200">
+                                <Filter className="w-3.5 h-3.5 mr-2" />
+                                Advanced Filters
+                            </Badge>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl shadow-premium border border-slate-100 overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="hover:bg-transparent">
+                                    <TableHead>Date & ID</TableHead>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead>Product Details</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="py-20 text-center">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full border-4 border-slate-100 border-t-primary animate-spin" />
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading Records...</span>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : sales.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="py-20 text-center">
+                                            <div className="flex flex-col items-center gap-4">
+                                                <div className="p-4 rounded-full bg-slate-50 text-slate-200">
+                                                    <ShoppingCart className="w-12 h-12" />
+                                                </div>
+                                                <span className="text-slate-400 font-bold">No sales records found for this period.</span>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    sales.map((sale) => (
+                                        <TableRow key={sale.id} className="group">
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="text-slate-900 font-bold">{new Date(sale.sale_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400">ID: #{sale.id.toString().padStart(4, '0')}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+                                                        <User className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    <span className="font-bold text-slate-700">
+                                                        {sale.customers?.name || <span className="text-slate-400 font-medium italic">Walk-in Customer</span>}
+                                                    </span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-slate-900">{sale.products?.name}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                                        {sale.quantity} {sale.products?.unit} @ ₹{sale.price}/{sale.products?.unit}
+                                                    </span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <span className="text-base font-black text-emerald-600">
+                                                    ₹{(sale.quantity * sale.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant={
+                                                    sale.status === 'paid' ? 'success' :
+                                                        sale.status === 'overdue' ? 'destructive' : 'warning'
+                                                }>
+                                                    {sale.status || 'PAID'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-1">
+                                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-primary hover:bg-primary/5" onClick={() => handleEdit(sale)}>
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteClick(sale.id)}>
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+
+                        {/* Pagination Bar */}
+                        {totalPages > 1 && (
+                            <div className="bg-slate-50 border-t border-slate-100 px-8 py-5 flex items-center justify-between">
+                                <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest">
+                                    Displaying <span className="text-slate-900">{((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)}</span> of <span className="text-slate-900">{totalItems}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-xl h-9 w-9 p-0 bg-white"
+                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1 || loading}
+                                    >
+                                        <ChevronLeft className="w-5 h-5" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-xl h-9 w-9 p-0 bg-white"
+                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages || loading}
+                                    >
+                                        <ChevronRight className="w-5 h-5" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -521,9 +578,9 @@ export default function SalesPage() {
                 isOpen={isDeleteDialogOpen}
                 onClose={() => setIsDeleteDialogOpen(false)}
                 onConfirm={handleConfirmDelete}
-                title="Delete Sale Record"
-                description="Are you sure you want to delete this sale? This action cannot be undone."
-                confirmText="Delete"
+                title="Void Transaction?"
+                description="This will permanently remove the sale from ledger and reverse stock changes. Proceed?"
+                confirmText="Void Transaction"
                 variant="danger"
             />
         </div>

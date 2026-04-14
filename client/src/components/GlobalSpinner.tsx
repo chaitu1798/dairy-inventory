@@ -4,33 +4,27 @@ import React, { useEffect, useState } from 'react';
 import { Spinner } from './ui/Spinner';
 
 export function GlobalSpinner() {
-    const [requestCount, setRequestCount] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
+        let requestCount = 0;
 
         const handleRequestStart = () => {
-            setRequestCount(prev => {
-                const next = prev + 1;
-                if (next > 0) {
-                    clearTimeout(timer);
-                    setIsLoading(true);
-                }
-                return next;
-            });
+            requestCount++;
+            if (requestCount > 0) {
+                clearTimeout(timer);
+                setIsLoading(true);
+            }
         };
 
         const handleRequestEnd = () => {
-            setRequestCount(prev => {
-                const next = Math.max(0, prev - 1);
-                if (next === 0) {
-                    timer = setTimeout(() => {
-                        setIsLoading(false);
-                    }, 200);
-                }
-                return next;
-            });
+            requestCount = Math.max(0, requestCount - 1);
+            if (requestCount === 0) {
+                timer = setTimeout(() => {
+                    setIsLoading(false);
+                }, 200);
+            }
         };
 
         globalThis.window?.addEventListener('axios-request-start', handleRequestStart);

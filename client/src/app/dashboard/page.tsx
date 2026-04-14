@@ -1,48 +1,100 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import api from '../../utils/api';
-import { DollarSign, ShoppingCart, TrendingUp, Package, AlertTriangle, Clock, TrendingDown, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+    DollarSign, 
+    ShoppingCart, 
+    TrendingUp, 
+    Package, 
+    AlertTriangle, 
+    Clock, 
+    Search, 
+    ArrowUpDown, 
+    ArrowUp, 
+    ArrowDown, 
+    ChevronLeft, 
+    ChevronRight,
+    ArrowUpRight,
+    ArrowDownRight,
+    Activity
+} from 'lucide-react';
 import { DashboardStats, Product } from '../../types';
 import Input from '../../components/ui/Input';
-import Tooltip from '../../components/ui/Tooltip'; // [NEW]
 import { Button } from '../../components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import Modal from '../../components/ui/Modal';
+import { toast } from 'sonner';
+import { generatePdfReport } from '../../utils/generatePdfReport';
+import { 
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '../../components/ui/Table';
+import { cn } from '../../lib/utils';
 
 interface StatCardProps {
     readonly title: string;
     readonly value: number | string;
     readonly icon: React.ElementType;
-    readonly color: string;
+    readonly trend?: {
+        value: string;
+        isUp: boolean;
+    };
     readonly suffix?: string;
-    readonly tooltip?: string;
+    readonly description?: string;
+    readonly gradient?: string;
 }
 
-const StatCard = ({ title, value, icon: Icon, color, suffix = '', tooltip }: StatCardProps) => (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-            <div>
-                <div className="flex items-center mb-1">
-                    <p className="text-gray-500 text-sm font-medium uppercase tracking-wider mr-2">{title}</p>
-                    {tooltip && <Tooltip content={tooltip} />}
+const StatCard = ({ title, value, icon: Icon, trend, suffix = '', description, gradient }: StatCardProps) => (
+    <Card className="overflow-hidden group">
+        <CardContent className="p-0">
+            <div className={cn("p-6", gradient && `bg-gradient-to-br ${gradient} text-white`)}>
+                <div className="flex items-center justify-between mb-4">
+                    <div className={cn(
+                        "p-2.5 rounded-xl",
+                        gradient ? "bg-white/20 backdrop-blur-md" : "bg-primary/10 text-primary"
+                    )}>
+                        <Icon className="w-5 h-5" />
+                    </div>
+                    {trend && (
+                        <div className={cn(
+                            "flex items-center text-xs font-bold px-2 py-1 rounded-full",
+                            gradient 
+                                ? "bg-white/20 backdrop-blur-md" 
+                                : trend.isUp ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                        )}>
+                            {trend.isUp ? <ArrowUpRight className="w-3 h-3 mr-1" /> : <ArrowDownRight className="w-3 h-3 mr-1" />}
+                            {trend.value}
+                        </div>
+                    )}
                 </div>
-                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{suffix}{typeof value === 'number' ? value.toFixed(2) : value || '0'}</h3>
+                <div>
+                    <p className={cn(
+                        "text-sm font-semibold uppercase tracking-wider mb-1",
+                        gradient ? "text-white/80" : "text-slate-500"
+                    )}>{title}</p>
+                    <h3 className="text-3xl font-extrabold tracking-tight">
+                        {suffix}{typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value || '0'}
+                    </h3>
+                    {description && (
+                        <p className={cn(
+                            "text-xs mt-2 font-medium",
+                            gradient ? "text-white/70" : "text-slate-400"
+                        )}>{description}</p>
+                    )}
+                </div>
             </div>
-            <div className={`p-4 rounded-xl ${color}`}>
-                <Icon className="w-6 h-6" />
-            </div>
-        </div>
-    </div>
+        </CardContent>
+    </Card>
 );
 
-interface SortIconProps {
-    readonly field: string;
-    readonly sortBy: string;
-    readonly sortOrder: 'asc' | 'desc';
-}
-
-const SortIcon = ({ field, sortBy, sortOrder }: SortIconProps) => {
-    if (sortBy !== field) return <ArrowUpDown className="w-4 h-4 ml-1 text-gray-400 opacity-50" />;
-    return sortOrder === 'asc' ? <ArrowUp className="w-4 h-4 ml-1 text-primary" /> : <ArrowDown className="w-4 h-4 ml-1 text-primary" />;
+const SortIcon = ({ field, sortBy, sortOrder }: { field: string, sortBy: string, sortOrder: 'asc' | 'desc' }) => {
+    if (sortBy !== field) return <ArrowUpDown className="w-4 h-4 ml-2 text-slate-300 transition-colors group-hover:text-slate-400" />;
+    return sortOrder === 'asc' ? <ArrowUp className="w-4 h-4 ml-2 text-primary animate-in fade-in zoom-in duration-300" /> : <ArrowDown className="w-4 h-4 ml-2 text-primary animate-in fade-in zoom-in duration-300" />;
 };
 
 export default function Dashboard() {
@@ -59,46 +111,66 @@ export default function Dashboard() {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [isLoadingInventory, setIsLoadingInventory] = useState(false);
 
-    useEffect(() => {
-        fetchDashboardData();
-        fetchExpiringItems();
-        fetchLowStockItems();
-    }, []);
+    // Dashboard Actions State
+    const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
 
-    // Debounce search
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchInventory();
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [search, page, sortBy, sortOrder]);
-
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = useCallback(async () => {
         try {
             const res = await api.get('/reports/dashboard');
             setDashboardData(res.data);
-        } catch (error) {
+        } catch (error: unknown) {
             console.warn('Error fetching dashboard data:', error);
         }
-    };
+    }, []);
 
-    const fetchInventory = async () => {
+    const fetchExpiringItems = useCallback(async () => {
+        try {
+            const res = await api.get('/reports/expiring');
+            setExpiringItems(res.data);
+        } catch (error: unknown) {
+            console.warn('Error fetching expiring items:', error);
+        }
+    }, []);
+
+    const fetchLowStockItems = useCallback(async () => {
+        try {
+            const res = await api.get('/reports/low-stock');
+            setLowStockItems(res.data);
+        } catch (error: unknown) {
+            console.warn('Error fetching low stock items:', error);
+        }
+    }, []);
+
+    const fetchInventory = useCallback(async () => {
         setIsLoadingInventory(true);
         try {
             const res = await api.get(`/reports/inventory?page=${page}&limit=10&search=${search}&sortBy=${sortBy}&sortOrder=${sortOrder}`);
-            // Handle both old array format (fallback) and new paginated object format
             if (Array.isArray(res.data)) {
                 setInventory(res.data);
             } else {
                 setInventory(res.data.data);
                 setTotalPages(res.data.totalPages);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             console.warn('Error fetching inventory:', error);
         } finally {
             setIsLoadingInventory(false);
         }
-    };
+    }, [page, search, sortBy, sortOrder]);
+
+    useEffect(() => {
+        fetchDashboardData();
+        fetchExpiringItems();
+        fetchLowStockItems();
+    }, [fetchDashboardData, fetchExpiringItems, fetchLowStockItems]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchInventory();
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [search, page, sortBy, sortOrder, fetchInventory]);
 
     const handleSort = (field: string) => {
         if (sortBy === field) {
@@ -109,351 +181,493 @@ export default function Dashboard() {
         }
     };
 
-    const fetchExpiringItems = async () => {
-        try {
-            const res = await api.get('/reports/expiring');
-            setExpiringItems(res.data);
-        } catch (error) {
-            console.warn('Error fetching expiring items:', error);
+    const handleViewAnalytics = () => {
+        if (!dashboardData) {
+            toast.error('Analytics data is still loading.');
+            return;
         }
+        setIsAnalyticsModalOpen(true);
     };
 
-    const fetchLowStockItems = async () => {
+    const handleDownloadSummary = async () => {
+        if (isDownloading) return;
+        setIsDownloading(true);
+        toast.info('Initiating report generation...', { id: 'pdf-gen' });
+        
         try {
-            const res = await api.get('/reports/low-stock');
-            setLowStockItems(res.data);
+            const today = new Date().toISOString().split('T')[0];
+            const res = await api.get(`/reports/daily/details?date=${today}`);
+            const { records, totals } = res.data;
+
+            await generatePdfReport({
+                title: "Executive Dashboard Summary",
+                date: today,
+                companyName: "Chaitanya Dairy",
+                summary: {
+                    totalProducts: dashboardData?.low_stock_count || records?.length || 0,
+                    totalPurchases: dashboardData?.today?.total_purchases || 0,
+                    totalSales: dashboardData?.today?.total_sales || 0,
+                    totalRevenue: dashboardData?.today?.total_sales || 0,
+                    totalProfit: dashboardData?.today?.net || 0
+                },
+                records: records || [],
+                totals: totals || {
+                    total_purchase_value: 0,
+                    total_sales_value: 0,
+                    total_gross_profit: 0,
+                    total_expenses: 0,
+                    net_profit: 0
+                }
+            });
+
+            toast.success('Summary downloaded successfully!', { id: 'pdf-gen' });
         } catch (error) {
-            console.warn('Error fetching low stock items:', error);
+            console.error('Failed to download summary:', error);
+            toast.error('Failed to generate summary file', { id: 'pdf-gen' });
+        } finally {
+            setIsDownloading(false);
         }
     };
 
     return (
-        <div className="space-y-12 max-w-7xl mx-auto">
-            <div>
-                <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
-                <p className="text-lg text-gray-500 mt-2 font-medium">Welcome back! Here's an overview of your dairy business.</p>
+        <div className="space-y-10 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Hero Welcome Section */}
+            <div className="relative overflow-hidden rounded-3xl bg-slate-900 px-8 py-10 md:px-12 md:py-16 text-white shadow-2xl">
+                <div className="relative z-10 max-w-2xl">
+                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 font-heading">
+                        Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">Manager</span>
+                    </h1>
+                    <p className="text-lg text-slate-300 font-medium leading-relaxed">
+                        Your dairy inventory is looking good today. You have {dashboardData?.low_stock_count || 0} low stock items that might need your attention.
+                    </p>
+                    <div className="flex flex-wrap gap-4 mt-8">
+                        <Button 
+                            variant="gradient" 
+                            size="lg" 
+                            className="rounded-full shadow-lg shadow-blue-500/25 group transition-transform hover:scale-105 disabled:opacity-50"
+                            onClick={handleViewAnalytics}
+                        >
+                            <Activity className="w-5 h-5 mr-2 group-hover:animate-pulse" />
+                            View Analytics
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="lg" 
+                            className="rounded-full bg-white/10 hover:bg-white/20 border-white/10 text-white transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={handleDownloadSummary}
+                            disabled={isDownloading}
+                            title="Download PDF report of current data"
+                        >
+                            {isDownloading ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white animate-spin mr-2 rounded-full" />
+                                    Generating...
+                                </>
+                            ) : (
+                                "Download Summary"
+                            )}
+                        </Button>
+                    </div>
+                </div>
+                {/* Decorative background elements */}
+                <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px]" />
+                <div className="absolute bottom-0 right-0 translate-y-1/2 -translate-x-1/4 w-80 h-80 bg-cyan-500/10 rounded-full blur-[80px]" />
             </div>
 
-            {/* Today's Stats */}
-
+            {/* Today's Performance Grid */}
             <section className="space-y-6">
-                <h2 className="text-lg font-semibold text-gray-900 tracking-tight">Today's Performance</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight font-heading">Today&apos;s Insights</h2>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <StatCard
                         title="Sales"
                         value={dashboardData?.today?.total_sales ?? 0}
                         icon={TrendingUp}
-                        color="bg-emerald-50 text-emerald-600"
+                        trend={{ value: "12%", isUp: true }}
                         suffix="₹"
+                        gradient="from-blue-600 to-blue-500"
                     />
                     <StatCard
                         title="Purchases"
                         value={dashboardData?.today?.total_purchases ?? 0}
                         icon={ShoppingCart}
-                        color="bg-blue-50 text-blue-600"
                         suffix="₹"
+                        gradient="from-indigo-600 to-indigo-500"
                     />
                     <StatCard
                         title="Expenses"
                         value={dashboardData?.today?.total_expenses ?? 0}
                         icon={DollarSign}
-                        color="bg-rose-50 text-rose-600"
                         suffix="₹"
+                        gradient="from-slate-800 to-slate-700"
                     />
                     <StatCard
                         title="Net Profit"
                         value={dashboardData?.today?.net ?? 0}
-                        icon={Package}
-                        color={(dashboardData?.today?.net ?? 0) >= 0
-                            ? "bg-indigo-50 text-indigo-600"
-                            : "bg-orange-50 text-orange-600"}
+                        icon={TrendingUp}
                         suffix="₹"
-                        tooltip="Total Sales - (Total Purchases + Total Expenses)"
+                        description="Net margin calculation"
+                        gradient={(dashboardData?.today?.net ?? 0) >= 0 ? "from-emerald-600 to-emerald-500" : "from-rose-600 to-rose-500"}
                     />
                 </div>
             </section>
 
-            {/* Stock & Alerts Overview */}
-
-            <section className="space-y-6">
-                <h2 className="text-lg font-semibold text-gray-900 tracking-tight">Inventory Status</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <StatCard
-                        title="Total Stock Value"
-                        value={dashboardData?.total_stock_value ?? 0}
-                        icon={Package}
-                        color="bg-purple-50 text-purple-600"
-                        suffix="₹"
-                        tooltip="Total value of current inventory calculated using Cost Price."
-                    />
-                    <StatCard
-                        title="Low Stock Items"
-                        value={dashboardData?.low_stock_count || 0}
-                        icon={AlertTriangle}
-                        color="bg-amber-50 text-amber-600"
-                    />
-                    <StatCard
-                        title="Expiring Soon"
-                        value={dashboardData?.expiring_count || 0}
-                        icon={Clock}
-                        color="bg-red-50 text-red-600"
-                    />
-                </div>
-            </section>
-
-            {/* Alerts Section */}
-            {(lowStockItems.length > 0 || expiringItems.length > 0) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Low Stock Alerts */}
-                    {lowStockItems.length > 0 && (
-                        <div className="bg-white rounded-xl shadow-sm border-l-4 border-amber-500 overflow-hidden">
-                            <div className="p-6 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
-                                <div className="flex items-center">
-                                    <AlertTriangle className="w-6 h-6 text-amber-600 mr-2" />
-                                    <h2 className="text-xl font-bold text-amber-900">Low Stock</h2>
-                                </div>
-                                <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full">{lowStockItems.length} items</span>
-                            </div>
-                            <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
-                                {lowStockItems.map((item) => (
-                                    <div key={item.id} className="p-4 hover:bg-amber-50/30 transition-colors">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <p className="font-semibold text-gray-900">{item.name}</p>
-                                            <p className="text-sm font-bold text-amber-600">{item.current_stock} {item.unit}</p>
-                                        </div>
-                                        <div className="flex justify-between items-center text-xs text-gray-500">
-                                            <span>{item.category}</span>
-                                            <span>Min: {item.min_stock}</span>
-                                        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Side: Inventory Status & Alerts */}
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Secondary Stats */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <Card isGlass={false} className="border-none bg-slate-50">
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-white shadow-sm text-blue-600">
+                                        <Package className="w-6 h-6" />
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Expiring Soon Alerts */}
-                    {expiringItems.length > 0 && (
-                        <div className="bg-white rounded-xl shadow-sm border-l-4 border-red-500 overflow-hidden">
-                            <div className="p-6 bg-red-50 border-b border-red-100 flex justify-between items-center">
-                                <div className="flex items-center">
-                                    <Clock className="w-6 h-6 text-red-600 mr-2" />
-                                    <h2 className="text-xl font-bold text-red-900">Expiring Soon</h2>
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Stock Value</p>
+                                        <h4 className="text-xl font-extrabold text-slate-900">₹{dashboardData?.total_stock_value?.toLocaleString() || '0'}</h4>
+                                    </div>
                                 </div>
-                                <span className="bg-red-100 text-red-800 text-xs font-bold px-2.5 py-0.5 rounded-full">{expiringItems.length} items</span>
-                            </div>
-                            <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
-                                {expiringItems.map((item) => (
-                                    <div key={item.id || `${item.name}-${item.expiry_date}`} className="p-4 hover:bg-red-50/30 transition-colors">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <p className="font-semibold text-gray-900">{item.name}</p>
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                                {item.days_until_expiry} days
+                            </CardContent>
+                        </Card>
+                        <Card isGlass={false} className="border-none bg-amber-50">
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-white shadow-sm text-amber-600">
+                                        <AlertTriangle className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-amber-500 uppercase tracking-wider">Low Stock</p>
+                                        <h4 className="text-xl font-extrabold text-slate-900">{dashboardData?.low_stock_count || 0} Items</h4>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card isGlass={false} className="border-none bg-rose-50">
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-white shadow-sm text-rose-600">
+                                        <Clock className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-rose-500 uppercase tracking-wider">Expiring</p>
+                                        <h4 className="text-xl font-extrabold text-slate-900">{dashboardData?.expiring_count || 0} Items</h4>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Alerts Layout */}
+                    {(lowStockItems.length > 0 || expiringItems.length > 0) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {lowStockItems.length > 0 && (
+                                <Card className="border-none shadow-premium bg-white/50">
+                                    <CardHeader className="pb-4">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-lg flex items-center text-amber-900">
+                                                <AlertTriangle className="w-5 h-5 mr-2 text-amber-500" />
+                                                Low Stock Alerts
+                                            </CardTitle>
+                                            <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-widest">
+                                                {lowStockItems.length} critical
                                             </span>
                                         </div>
-                                        <div className="flex justify-between items-center text-xs text-gray-500">
-                                            <span>{item.category}</span>
-                                            <span>Expires: {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : 'N/A'}</span>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-3">
+                                            {lowStockItems.slice(0, 4).map((item) => (
+                                                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-white/50 border border-slate-100/50 hover:bg-white transition-all cursor-default group">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-bold text-slate-800">{item.name}</span>
+                                                        <span className="text-[10px] font-medium text-slate-400">{item.category}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="block text-sm font-black text-amber-600">{item.current_stock} {item.unit}</span>
+                                                        <span className="block text-[10px] font-bold text-slate-300">Min: {item.min_stock}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {lowStockItems.length > 4 && (
+                                                <Button variant="ghost" size="sm" className="w-full text-slate-400 hover:text-primary text-xs font-bold">
+                                                    View All Low Stock Items
+                                                </Button>
+                                            )}
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {expiringItems.length > 0 && (
+                                <Card className="border-none shadow-premium bg-white/50">
+                                    <CardHeader className="pb-4">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-lg flex items-center text-rose-900">
+                                                <Clock className="w-5 h-5 mr-2 text-rose-500" />
+                                                Expiring Soon
+                                            </CardTitle>
+                                            <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black uppercase tracking-widest">
+                                                Next 7 Days
+                                            </span>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-3">
+                                            {expiringItems.slice(0, 4).map((item) => (
+                                                <div key={item.id || `${item.name}-${item.expiry_date}`} className="flex items-center justify-between p-3 rounded-xl bg-white/50 border border-slate-100/50 hover:bg-white transition-all cursor-default group">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-bold text-slate-800">{item.name}</span>
+                                                        <span className="text-[10px] font-medium text-slate-400">Expires: {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : 'N/A'}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 text-[11px] font-bold">
+                                                            {item.days_until_expiry}d left
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {expiringItems.length > 4 && (
+                                                <Button variant="ghost" size="sm" className="w-full text-slate-400 hover:text-primary text-xs font-bold">
+                                                    View All Expiring Items
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
                         </div>
                     )}
                 </div>
-            )}
 
-            {/* Top Selling Products */}
-            {dashboardData?.top_selling_products && dashboardData.top_selling_products.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-8 border-b border-gray-100">
-                        <h2 className="text-xl font-bold text-gray-900 flex items-center tracking-tight">
-                            <TrendingUp className="w-5 h-5 text-green-600 mr-2" />
-                            Top Selling Products
-                        </h2>
-                    </div>
-                    <div className="p-8">
-                        <div className="space-y-6">
-                            {dashboardData.top_selling_products.map((product, idx: number) => (
-                                <div key={product.id || idx} className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-6">
-                                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-50 text-green-600 font-bold text-sm">
+                {/* Right Side: Top Selling & Activity */}
+                <Card className="border-none bg-white shadow-premium flex flex-col h-full overflow-hidden">
+                    <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+                        <CardTitle className="text-lg flex items-center mb-1">
+                            <TrendingUp className="w-5 h-5 mr-2 text-emerald-500" />
+                            Top Performers
+                        </CardTitle>
+                        <CardDescription>Most sold products this month</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0 overflow-y-auto max-h-[600px] scrollbar-modern">
+                        <div className="divide-y divide-slate-50 px-6">
+                            {dashboardData?.top_selling_products?.map((product, idx: number) => (
+                                <div key={product.id || idx} className="py-5 flex items-center justify-between group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-slate-100 text-slate-500 font-black text-xs group-hover:bg-primary group-hover:text-white transition-all duration-300">
                                             {idx + 1}
                                         </div>
-                                        <div>
-                                            <p className="font-semibold text-gray-900 text-lg">{product.name}</p>
-                                            <p className="text-sm text-gray-500 mt-1">{product.category}</p>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 leading-tight">{product.name}</span>
+                                            <span className="text-[11px] font-semibold text-slate-400 leading-tight">{product.category}</span>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="font-bold text-green-600 text-lg">₹{product.total_revenue?.toFixed(2)}</p>
-                                        <p className="text-sm text-gray-500 mt-1">{product.total_quantity_sold} units sold</p>
+                                        <span className="block text-sm font-black text-slate-900">₹{product.total_revenue?.toLocaleString()}</span>
+                                        <span className="block text-[11px] font-bold text-emerald-500">{product.total_quantity_sold} sold</span>
                                     </div>
                                 </div>
-                            ))}
+                            )) || (
+                                <div className="py-10 text-center text-slate-400 text-sm font-medium">No performance data yet.</div>
+                            )}
                         </div>
-                    </div>
-                </div>
-            )}
+                    </CardContent>
+                </Card>
+            </div>
 
-            {/* Current Inventory - Responsive */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-8 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                    <h2 className="text-xl font-bold text-gray-900 tracking-tight">Current Inventory</h2>
-                    <div className="relative max-w-sm w-full sm:w-72">
+            {/* Current Inventory Table Section */}
+            <section className="space-y-6 pb-10">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-900 tracking-tight font-heading">Inventory Overview</h2>
+                        <p className="text-sm text-slate-500 font-medium">Detailed tracking of all available dairy products</p>
+                    </div>
+                    <div className="relative w-full sm:w-80 group">
                         <Input
-                            label="Search Products"
-                            placeholder="Search by name..."
+                            label=""
+                            placeholder="Search inventory..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             startAdornment={<Search className="w-4 h-4" />}
-                            className="bg-gray-50"
+                            className="h-11 shadow-sm bg-white"
                         />
                     </div>
                 </div>
 
-                {/* Mobile View: Card Stack */}
-                <div className="md:hidden divide-y divide-gray-100">
-                    {inventory.map((item) => (
-                        <div key={item.id} className="p-4 space-y-3">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h3 className="font-semibold text-gray-900 text-lg">{item.name}</h3>
-                                    <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600">
-                                        {item.category || 'Uncategorized'}
-                                    </span>
-                                </div>
-                                <div className="text-right">
-                                    {item.is_low_stock ? (
-                                        <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 flex items-center">
-                                            <AlertTriangle className="w-3 h-3 mr-1" aria-hidden="true" />
-                                            Low
-                                        </span>
-                                    ) : (
-                                        <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                                            OK
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 pt-2">
-                                <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-xs text-gray-500 uppercase font-semibold">Stock</p>
-                                    <p className="text-lg font-bold text-gray-900">{item.current_stock} <span className="text-sm font-normal text-gray-500">{item.unit}</span></p>
-                                </div>
-                                <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-xs text-gray-500 uppercase font-semibold">Value</p>
-                                    <p className="text-lg font-bold text-gray-900">₹{item.stock_value?.toFixed(2)}</p>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                    {inventory.length === 0 && (
-                        <div className="p-8 text-center text-gray-500">No inventory items found.</div>
-                    )}
-                </div>
-
-                {/* Desktop View: Table */}
-                <div className="hidden md:block overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-100">
-                        <thead className="bg-gray-50/50">
-                            <tr>
-                                <th
-                                    className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-900 transition-colors"
-                                    onClick={() => handleSort('name')}
-                                >
+                <div className="bg-white rounded-3xl shadow-premium border border-slate-100 overflow-hidden">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead className="cursor-pointer group" onClick={() => handleSort('name')}>
                                     <div className="flex items-center">Product <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} /></div>
-                                </th>
-                                <th
-                                    className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-900 transition-colors"
-                                    onClick={() => handleSort('category')}
-                                >
+                                </TableHead>
+                                <TableHead className="cursor-pointer group" onClick={() => handleSort('category')}>
                                     <div className="flex items-center">Category <SortIcon field="category" sortBy={sortBy} sortOrder={sortOrder} /></div>
-                                </th>
-                                <th
-                                    className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-900 transition-colors"
-                                    onClick={() => handleSort('current_stock')}
-                                >
-                                    <div className="flex items-center">Stock <SortIcon field="current_stock" sortBy={sortBy} sortOrder={sortOrder} /></div>
-                                </th>
-                                <th
-                                    className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-900 transition-colors"
-                                    onClick={() => handleSort('stock_value')}
-                                >
-                                    <div className="flex items-center">Stock Value <SortIcon field="stock_value" sortBy={sortBy} sortOrder={sortOrder} /></div>
-                                </th>
-                                <th className="px-8 py-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-100">
+                                </TableHead>
+                                <TableHead className="cursor-pointer group text-right" onClick={() => handleSort('current_stock')}>
+                                    <div className="flex items-center justify-end">Stock <SortIcon field="current_stock" sortBy={sortBy} sortOrder={sortOrder} /></div>
+                                </TableHead>
+                                <TableHead className="cursor-pointer group text-right" onClick={() => handleSort('stock_value')}>
+                                    <div className="flex items-center justify-end">Value <SortIcon field="stock_value" sortBy={sortBy} sortOrder={sortOrder} /></div>
+                                </TableHead>
+                                <TableHead className="text-right">Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {isLoadingInventory ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                                        Loading inventory data...
-                                    </td>
-                                </tr>
+                                <TableRow>
+                                    <TableCell colSpan={5} className="py-20 text-center overflow-hidden relative">
+                                        <div className="absolute inset-x-0 top-0 h-1 bg-blue-100 overflow-hidden">
+                                            <div className="h-full bg-primary animate-progress w-full transition-all" />
+                                        </div>
+                                        <span className="text-slate-400 font-bold tracking-widest uppercase text-xs">Synchronizing Data...</span>
+                                    </TableCell>
+                                </TableRow>
                             ) : inventory.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                                        No inventory items found.
-                                    </td>
-                                </tr>
+                                <TableRow>
+                                    <TableCell colSpan={5} className="py-20 text-center">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="p-4 rounded-full bg-slate-50 text-slate-300">
+                                                <Package className="w-12 h-12" />
+                                            </div>
+                                            <span className="text-slate-400 font-bold">No products found match your search criteria.</span>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
                             ) : (
                                 inventory.map((item) => (
-                                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
-                                        <td className="px-8 py-5 whitespace-nowrap text-sm font-semibold text-gray-900">
-                                            {item.name}
-                                        </td>
-                                        <td className="px-8 py-5 whitespace-nowrap text-sm text-gray-500">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                {item.category || 'N/A'}
+                                    <TableRow key={item.id} className="group">
+                                        <TableCell>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center font-bold text-slate-400 text-[10px] group-hover:bg-primary group-hover:text-white transition-colors duration-300">
+                                                    {item.name.charAt(0)}
+                                                </div>
+                                                <span className="font-bold text-slate-900">{item.name}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-wider">
+                                                {item.category || 'Legacy'}
                                             </span>
-                                        </td>
-                                        <td className="px-8 py-5 whitespace-nowrap text-sm text-gray-600 font-medium">{item.current_stock} <span className="text-gray-400 font-normal">{item.unit}</span></td>
-                                        <td className="px-8 py-5 whitespace-nowrap text-sm font-semibold text-gray-900">₹{item.stock_value?.toFixed(2)}</td>
-                                        <td className="px-8 py-5 whitespace-nowrap">
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex flex-col">
+                                                <span className="text-slate-900 font-extrabold">{item.current_stock}</span>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{item.unit}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <span className="text-slate-900 font-extrabold">₹{item.stock_value?.toLocaleString()}</span>
+                                        </TableCell>
+                                        <TableCell className="text-right">
                                             {item.is_low_stock ? (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
-                                                    Low
+                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-500/10">
+                                                    Low Stock
                                                 </span>
                                             ) : (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                                                    Optimal
+                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-500/10">
+                                                    Healthy
                                                 </span>
                                             )}
-                                        </td>
-                                    </tr>
+                                        </TableCell>
+                                    </TableRow>
                                 ))
                             )}
-                        </tbody>
-                    </table>
-                </div>
+                        </TableBody>
+                    </Table>
 
-                {/* Pagination Stats & Controls */}
-                <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-                    <p className="text-sm text-gray-500">
-                        Page {page} of {totalPages}
-                    </p>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                            disabled={page === 1 || isLoadingInventory}
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages || isLoadingInventory}
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </Button>
+                    {/* Modern Pagination Bar */}
+                    <div className="bg-slate-50 border-t border-slate-100 px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest">
+                            Showing page <span className="text-slate-900">{page}</span> of <span className="text-slate-900">{totalPages}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl h-9 w-9 p-0 bg-white"
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page === 1 || isLoadingInventory}
+                            >
+                                <ChevronLeft className="w-5 h-5" />
+                            </Button>
+                            {/* Page numbers could go here for more direct navigation */}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl h-9 w-9 p-0 bg-white"
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={page === totalPages || isLoadingInventory}
+                            >
+                                <ChevronRight className="w-5 h-5" />
+                            </Button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
+
+            {/* Analytics Modal Section */}
+            {isAnalyticsModalOpen && (
+                <Modal 
+                    isOpen={isAnalyticsModalOpen} 
+                    onClose={() => setIsAnalyticsModalOpen(false)}
+                    className="max-w-4xl w-full p-0 rounded-3xl overflow-hidden"
+                >
+                    <div className="bg-slate-900 px-8 py-6 text-white flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-black font-heading flex items-center">
+                                <Activity className="w-6 h-6 mr-3 text-blue-400" />
+                                Deep Analytics
+                            </h2>
+                            <p className="text-slate-400 text-sm mt-1">Holistic view of all operations</p>
+                        </div>
+                    </div>
+                    <div className="p-8 space-y-8 bg-slate-50/50 max-h-[80vh] overflow-y-auto w-full">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            <div className="p-4 rounded-2xl bg-white shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Total Revenue</span>
+                                <span className="text-2xl font-black text-blue-600">₹{(dashboardData?.today?.total_sales || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-white shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Total Expiring</span>
+                                <span className="text-2xl font-black text-rose-600">{dashboardData?.expiring_count || 0}</span>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-white shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Total Stock Val</span>
+                                <span className="text-2xl font-black text-emerald-600">₹{dashboardData?.total_stock_value?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-white shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Low Stock</span>
+                                <span className="text-2xl font-black text-amber-600">{dashboardData?.low_stock_count || 0}</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Top Fast Moving Items</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {dashboardData?.top_selling_products?.slice(0,4).map((p, i) => (
+                                    <div key={p.id || i} className="p-4 bg-white rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-slate-900">#{i+1} {p.name}</span>
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase">{p.category}</span>
+                                        </div>
+                                        <div className="text-right flex flex-col">
+                                            <span className="font-black text-slate-900">₹{p.total_revenue?.toLocaleString()}</span>
+                                            <span className="text-[10px] text-emerald-500 font-bold">{p.total_quantity_sold} moving</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex justify-end pt-4 border-t border-slate-200">
+                            <Button variant="outline" onClick={() => setIsAnalyticsModalOpen(false)} className="rounded-xl font-bold">
+                                Close Analytics
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 }

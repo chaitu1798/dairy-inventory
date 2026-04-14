@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { FieldError } from 'react-hook-form';
 import { cn } from '../../lib/utils';
+import { ChevronDown } from 'lucide-react';
 
 export interface SelectOption {
     readonly value: string;
@@ -17,20 +18,25 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
     ({ label, options, error, placeholder, className, helperText, ...props }, ref) => {
+        const id = props.id || props.name;
+
         return (
-            <div className="w-full space-y-2">
+            <div className="w-full space-y-1.5 group">
                 <label
-                    htmlFor={props.id || props.name}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    htmlFor={id}
+                    className="text-[13px] font-semibold text-slate-700 ml-1 transition-colors group-focus-within:text-primary"
                 >
                     {label}
                 </label>
                 <div className="relative">
                     <select
                         ref={ref}
+                        id={id}
                         className={cn(
-                            "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none transition-colors",
-                            error && "border-destructive focus-visible:ring-destructive",
+                            "flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm transition-all duration-200 appearance-none outline-none",
+                            "placeholder:text-slate-400 focus:ring-4 focus:ring-primary/5 focus:border-primary",
+                            "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-50",
+                            error && "border-destructive focus:ring-destructive/5 focus:border-destructive",
                             className
                         )}
                         aria-invalid={error ? 'true' : 'false'}
@@ -43,24 +49,21 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
                         }
                         {...props}
                     >
-                        {placeholder && <option value="">{placeholder}</option>}
+                        {placeholder && <option value="" disabled>{placeholder}</option>}
                         {options.map((option) => (
                             <option key={option.value} value={option.value}>
                                 {option.label}
                             </option>
                         ))}
                     </select>
-                    {/* Chevron Icon for better styling since we removed default appearance */}
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                        <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                        </svg>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 group-focus-within:text-primary transition-colors">
+                        <ChevronDown className="h-4 w-4" />
                     </div>
                 </div>
                 {helperText && !error && (
                     <p
                         id={`${props.name}-description`}
-                        className="text-xs text-muted-foreground"
+                        className="text-[11px] text-slate-500 ml-1 font-medium"
                     >
                         {helperText}
                     </p>
@@ -68,7 +71,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 {error && (
                     <p
                         id={`${props.name}-error`}
-                        className="text-sm font-medium text-destructive animate-slide-down"
+                        className="text-[12px] font-medium text-destructive ml-1 fade-up"
                         role="alert"
                     >
                         {error.message}

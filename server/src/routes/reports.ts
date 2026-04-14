@@ -279,6 +279,8 @@ router.get('/daily/details', requireAuth, async (req, res) => {
             return {
                 date: targetDate,
                 product_name: product.name,
+                category: product.categoryName || product.category || 'General',
+                unit_price: product.price || 0,
                 opening_stock: openingStock,
                 purchases_qty: purchasedQty,
                 sales_qty: soldQty,

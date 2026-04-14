@@ -104,9 +104,16 @@ app.listen(port, () => {
     console.log(`Local: http://localhost:${port}`);
 
     // Environment Check
+    const hasProjectId =
+        process.env.FIREBASE_PROJECT_ID ||
+        process.env.GOOGLE_CLOUD_PROJECT ||
+        process.env.GCLOUD_PROJECT;
     const hasCredentials = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
     if (!hasCredentials) {
         console.warn('⚠️  No FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH set — using Application Default Credentials (ADC)');
+    }
+    if (!hasProjectId) {
+        console.warn('⚠️  FIREBASE_PROJECT_ID is not set — auth token verification may fail outside GCP');
     }
     if (!process.env.FIREBASE_STORAGE_BUCKET) {
         console.warn('⚠️  FIREBASE_STORAGE_BUCKET is not set — image uploads may fail');

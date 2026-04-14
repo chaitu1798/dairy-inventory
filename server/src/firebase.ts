@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -7,9 +8,16 @@ dotenv.config();
 const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
+const projectId =
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.GCLOUD_PROJECT;
 
 if (!admin.apps.length) {
-    let appOptions: admin.AppOptions = { storageBucket };
+    const appOptions: admin.AppOptions = {
+        storageBucket,
+        ...(projectId ? { projectId } : {}),
+    };
 
     if (serviceAccountJson) {
         // Option 1: Inline JSON string (best for containers/Cloud Run)
@@ -25,8 +33,14 @@ if (!admin.apps.length) {
         const absolutePath = path.isAbsolute(serviceAccountPath)
             ? serviceAccountPath
             : path.join(process.cwd(), serviceAccountPath);
-        appOptions.credential = admin.credential.cert(absolutePath);
-        console.log('[Firebase] Using service account file at:', absolutePath);
+        if (fs.existsSync(absolutePath)) {
+            appOptions.credential = admin.credential.cert(absolutePath);
+            console.log('[Firebase] Using service account file at:', absolutePath);
+        } else {
+            console.warn('[Firebase] FIREBASE_SERVICE_ACCOUNT_PATH was set but file was not found:', absolutePath);
+            appOptions.credential = admin.credential.applicationDefault();
+            console.log('[Firebase] Falling back to Application Default Credentials');
+        }
     } else {
         // Option 3: Application Default Credentials (automatic on Cloud Run / GCP)
         // No explicit credential needed — will use the GCP service account attached to the instance

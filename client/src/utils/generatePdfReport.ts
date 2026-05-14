@@ -6,8 +6,14 @@ interface ReportRecord {
     readonly category: string;
     readonly purchases_qty: number;
     readonly sales_qty: number;
+    readonly counter_sales_qty?: number;
+    readonly distribution_sales_qty?: number;
     readonly closing_stock: number;
+    readonly opening_stock?: number;
     readonly unit_price: number;
+    readonly total_sales_value?: number;
+    readonly counter_sales_value?: number;
+    readonly distribution_sales_value?: number;
 }
 
 export interface PDFReportData {
@@ -32,9 +38,10 @@ export interface PDFReportData {
 }
 
 export const generatePdfReport = async (data: PDFReportData) => {
-    const doc = new jsPDF('p', 'mm', 'a4');
+    // 1. Report Layout: A4 landscape format
+    const doc = new jsPDF('l', 'mm', 'a4');
     
-    // Fetch Roboto font dynamically to support '₹' symbol correctly
+    // Fetch Roboto font dynamically to support '₹' symbol
     try {
         const fontUrl = "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf";
         const fontRes = await fetch(fontUrl);
@@ -50,159 +57,239 @@ export const generatePdfReport = async (data: PDFReportData) => {
         
         doc.addFileToVFS("Roboto-Regular.ttf", fontBase64);
         doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+        doc.addFont("Roboto-Regular.ttf", "Roboto", "bold");
         doc.setFont("Roboto");
     } catch (err) {
-        console.warn("Failed to load Roboto font, falling back to standard encoding.", err);
-    } // continue anyway
+        console.warn("Failed to load Roboto font", err);
+    }
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    let currentY = 20;
+    const margin = 10;
+    let currentY = 15;
 
-    // --- 1. HEADER SECTION (Enterprise Style) ---
-    doc.setFillColor(37, 99, 235); // Blue-600
-    doc.rect(0, 0, pageWidth, 45, 'F');
+    // --- 2. HEADER SECTION ---
+    // Enclosed inside bordered section
+    doc.setDrawColor(0); // Thin black border
+    doc.setLineWidth(0.5);
+    doc.rect(margin, currentY, pageWidth - margin * 2, 25);
     
-    doc.setTextColor(255, 255, 255); // White
-    
-    // Company Name (Chaitanya Dairy)
+    // Company/Dairy Name at top center in bold red
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(220, 38, 38); // Red-600
+    doc.text(data.companyName.toUpperCase(), pageWidth / 2, currentY + 8, { align: 'center' });
+
+    // Report title in blue bold text
+    doc.setFontSize(14);
+    doc.setTextColor(37, 99, 235); // Blue-600
+    doc.text(data.title.toUpperCase(), pageWidth / 2, currentY + 16, { align: 'center' });
+
+    // Branch, Date, Generated timestamp
     doc.setFont("Roboto", "normal");
-    doc.setFontSize(26);
-    doc.text(data.companyName, pageWidth / 2, 20, { align: 'center' });
-
-    // Report Title
-    doc.setFontSize(12);
-    doc.text(data.title.toUpperCase(), pageWidth / 2, 28, { align: 'center' });
-
-    // Date Info
     doc.setFontSize(9);
-    doc.text(`Report Date: ${data.date}  |  Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 36, { align: 'center' });
+    doc.setTextColor(0);
+    doc.text("Branch: Main Branch", margin + 5, currentY + 22);
+    doc.text(`Report Date: ${data.date}`, pageWidth / 2, currentY + 22, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, pageWidth - margin - 5, currentY + 22, { align: 'right' });
 
-    currentY = 60;
+    currentY += 30;
 
-    // --- 2. SUMMARY SECTION (Dashboard Cards) ---
-    const colWidth = (pageWidth - (margin * 2)) / 5;
-    const boxMargin = 2;
-    const summaryItems = [
-        { label: 'PRODUCTS', value: data.summary.totalProducts.toString(), color: [71, 85, 105] as [number, number, number] },
-        { label: 'PURCHASES', value: `₹${data.summary.totalPurchases.toLocaleString()}`, color: [30, 64, 175] as [number, number, number] },
-        { label: 'SALES', value: `₹${data.summary.totalSales.toLocaleString()}`, color: [30, 64, 175] as [number, number, number] },
-        { label: 'REVENUE', value: `₹${data.summary.totalRevenue.toLocaleString()}`, color: [30, 64, 175] as [number, number, number] },
-        { label: 'NET PROFIT', value: `₹${data.summary.totalProfit.toLocaleString()}`, color: data.summary.totalProfit >= 0 ? [5, 150, 105] as [number, number, number] : [225, 29, 72] as [number, number, number] }
+    // Filter active records
+    const activeRecords = data.records.filter(r => (r.purchases_qty || 0) > 0 || (r.sales_qty || 0) > 0);
+    const totalPurchaseQty = activeRecords.reduce((sum, r) => sum + (r.purchases_qty || 0), 0);
+    const totalCounterQty = activeRecords.reduce((sum, r) => sum + (r.counter_sales_qty || 0), 0);
+    const totalDistQty = activeRecords.reduce((sum, r) => sum + (r.distribution_sales_qty || 0), 0);
+
+    // --- 3. COMPACT SUMMARY SECTION ---
+    // Single-row summary table, light gray bg, bold labels
+    doc.setFillColor(241, 245, 249); // Slate-100
+    doc.rect(margin, currentY, pageWidth - margin * 2, 10, 'F');
+    doc.setDrawColor(0);
+    doc.rect(margin, currentY, pageWidth - margin * 2, 10);
+    
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0);
+    
+    const summaryText = `Total Active Products: ${activeRecords.length}   |   Total Purchase Qty: ${totalPurchaseQty}   |   Counter Sales Qty: ${totalCounterQty}   |   Dist Sales Qty: ${totalDistQty}   |   Total Revenue: ₹${data.totals.total_sales_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}   |   Net Profit: ₹${data.totals.net_profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    
+    doc.text(summaryText, pageWidth / 2, currentY + 6, { align: 'center' });
+
+    currentY += 15;
+
+    // --- 4 & 5. MAIN INVENTORY TABLE WITH GROUPED HEADERS ---
+    const tableHeaders: any[] = [
+        [
+            { content: 'S.No', rowSpan: 2 },
+            { content: 'Product Name', rowSpan: 2 },
+            { content: 'Opening\nStock', rowSpan: 2 },
+            { content: 'Purchase\nQty', rowSpan: 2 },
+            { content: 'Total\nStock', rowSpan: 2 },
+            { content: 'Counter Sales', colSpan: 2, styles: { halign: 'center' } },
+            { content: 'Distribution Sales', colSpan: 2, styles: { halign: 'center' } },
+            { content: 'Total\nSold', rowSpan: 2 },
+            { content: 'Closing\nStock', rowSpan: 2 },
+            { content: 'Unit\nPrice', rowSpan: 2 },
+            { content: 'Total\nRevenue', rowSpan: 2 }
+        ],
+        [
+            'Qty', 'Amount', 'Qty', 'Amount'
+        ]
     ];
 
-    doc.setFont("Roboto", "normal");
+    let sumPurchases = 0;
+    let sumCounterQty = 0;
+    let sumCounterValue = 0;
+    let sumDistQty = 0;
+    let sumDistValue = 0;
+    let sumTotalSold = 0;
+    let sumTotalRevenue = 0;
+    let sumClosingStock = 0;
 
-    summaryItems.forEach((item, i) => {
-        const x = margin + (i * colWidth);
-        const w = colWidth - (boxMargin * 2);
-        
-        // Draw card box
-        doc.setDrawColor(226, 232, 240); // Slate-200
-        doc.setFillColor(255, 255, 255);
-        doc.roundedRect(x + boxMargin, currentY, w, 25, 2, 2, 'FD');
-        
-        // Label
-        doc.setFontSize(6);
-        doc.setTextColor(148, 163, 184); // Slate-400
-        doc.text(item.label, x + (colWidth / 2), currentY + 8, { align: 'center' });
-        
-        // Value
-        doc.setFontSize(9);
-        const [r, g, b] = item.color;
-        doc.setTextColor(r, g, b);
-        doc.text(item.value, x + (colWidth / 2), currentY + 18, { align: 'center' });
+    const tableRows = activeRecords.map((r, i) => {
+        const totalStock = (r.opening_stock || 0) + (r.purchases_qty || 0);
+        const counterQty = r.counter_sales_qty || 0;
+        const counterVal = r.counter_sales_value || 0;
+        const distQty = r.distribution_sales_qty || 0;
+        const distVal = r.distribution_sales_value || 0;
+        const totalSold = counterQty + distQty;
+        const totalRev = counterVal + distVal;
+        const closingStock = totalStock - totalSold;
+
+        // Add to totals
+        sumPurchases += r.purchases_qty || 0;
+        sumCounterQty += counterQty;
+        sumCounterValue += counterVal;
+        sumDistQty += distQty;
+        sumDistValue += distVal;
+        sumTotalSold += totalSold;
+        sumTotalRevenue += totalRev;
+        sumClosingStock += closingStock;
+
+        return [
+            i + 1,
+            r.product_name || 'N/A',
+            r.opening_stock || 0,
+            r.purchases_qty || 0,
+            totalStock,
+            counterQty,
+            `₹${counterVal.toFixed(2)}`,
+            distQty,
+            `₹${distVal.toFixed(2)}`,
+            totalSold,
+            closingStock,
+            `₹${(r.unit_price || 0).toFixed(2)}`,
+            `₹${totalRev.toFixed(2)}`
+        ];
     });
 
-    currentY += 35;
-
-    // --- 3. TABLE SECTION (AutoTable) ---
-    const tableHeaders = [['S.No', 'Product Name', 'Category', 'Purchased', 'Sold', 'Stock', 'Unit Price', 'Total Value']];
-    const tableRows = data.records.map((r, i) => [
-        i + 1,
-        r.product_name || 'N/A',
-        r.category || 'N/A',
-        r.purchases_qty,
-        r.sales_qty,
-        r.closing_stock,
-        `₹${(r.unit_price || 0).toFixed(2)}`,
-        `₹${((r.unit_price || 0) * (r.sales_qty || 0)).toFixed(2)}`
+    // 7. TOTALS ROW
+    tableRows.push([
+        '', 
+        'TOTALS', 
+        '', 
+        sumPurchases as any, 
+        '', 
+        sumCounterQty as any, 
+        `₹${sumCounterValue.toFixed(2)}`, 
+        sumDistQty as any, 
+        `₹${sumDistValue.toFixed(2)}`, 
+        sumTotalSold as any, 
+        sumClosingStock as any, 
+        '', 
+        `₹${sumTotalRevenue.toFixed(2)}`
     ]);
 
     autoTable(doc, {
         startY: currentY,
         head: tableHeaders,
         body: tableRows,
-        theme: 'striped',
-        headStyles: { 
-            fillColor: [59, 130, 246], 
-            textColor: 255, 
-            fontSize: 9, 
+        theme: 'grid', // Accounting style
+        styles: { 
+            font: 'Roboto',
+            fontSize: 8,
+            cellPadding: 2,
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1,
+            textColor: 0
+        },
+        headStyles: {
+            fillColor: [241, 245, 249], // Light gray
+            textColor: 0,
+            fontStyle: 'bold',
             halign: 'center',
-            font: 'Roboto'
+            valign: 'middle'
         },
-        bodyStyles: { 
-            fontSize: 8, 
-            halign: 'center', 
-            textColor: 51,
-            font: 'Roboto' 
+        bodyStyles: {
+            halign: 'center'
         },
-        alternateRowStyles: { 
-            fillColor: [241, 245, 249] // Slate-100
+        columnStyles: {
+            1: { halign: 'left' } // Product Name left aligned
         },
-        margin: { left: margin, right: margin },
-        styles: { cellPadding: 3 },
+        alternateRowStyles: {
+            fillColor: [250, 250, 250]
+        },
+        willDrawCell: function(data) {
+            // Check if it is the Totals row (the last row)
+            if (data.row.index === tableRows.length - 1 && data.section === 'body') {
+                doc.setFont("Roboto", "bold");
+                doc.setFillColor(226, 232, 240); // Dark gray bg for totals
+            }
+        },
         didDrawPage: (data) => {
             currentY = data.cursor ? data.cursor.y : currentY;
         }
     });
 
-    // --- 4. FOOTER SECTION ---
+    currentY += 15;
     if (currentY > doc.internal.pageSize.getHeight() - 40) {
         doc.addPage();
         currentY = 20;
-    } else {
-        currentY += 15;
     }
 
-    // Grand Totals Summary
-    doc.setDrawColor(59, 130, 246);
+    // --- 8. REVENUE SUMMARY FOOTER ---
+    doc.setDrawColor(0);
     doc.setLineWidth(0.5);
-    doc.line(margin, currentY, pageWidth - margin, currentY);
-    currentY += 8;
-
-    doc.setFont("Roboto", "normal");
+    doc.line(margin, currentY, pageWidth - margin, currentY); // Top separator line
+    
+    currentY += 10;
+    
+    doc.setFont("Roboto", "bold");
     doc.setFontSize(10);
-    doc.setTextColor(30, 41, 59);
+    doc.text("FINANCIAL SUMMARY:", margin, currentY);
     
-    doc.text("Daily Summary Totals", margin, currentY);
-    
+    currentY += 8;
+    doc.setFont("Roboto", "normal");
     doc.setFontSize(9);
-    const totalLine1 = `Total Revenue: ₹${data.totals.total_sales_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}    |    Total Expenses: ₹${data.totals.total_expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    doc.text(totalLine1, margin, currentY + 8);
-
-    const totalLine2 = `Final Net Daily Profit: ₹${data.totals.net_profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    const [profitR, profitG, profitB] = data.totals.net_profit >= 0 ? [5, 150, 105] : [225, 29, 72];
-    doc.setTextColor(profitR, profitG, profitB);
-    doc.text(totalLine2, margin, currentY + 16);
-
-    // Signature Area
-    currentY += 35;
-    doc.setDrawColor(203, 213, 225); // Slate-300
-    doc.line(margin, currentY, margin + 50, currentY);
-    doc.line(pageWidth - margin - 50, currentY, pageWidth - margin, currentY);
+    doc.text(`Total Revenue: ₹${data.totals.total_sales_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, margin, currentY);
+    doc.text(`Total Expenses: ₹${data.totals.total_expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, margin + 60, currentY);
     
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184); // Slate-400
-    doc.text("Authorized Signature", margin, currentY + 5);
-    doc.text("Manager's Approval", pageWidth - margin, currentY + 5, { align: 'right' });
+    const profit = data.totals.net_profit;
+    doc.setFont("Roboto", "bold");
+    doc.text(`Net Profit: ₹${profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, margin + 120, currentY);
+    
+    currentY += 5;
+    doc.line(margin, currentY, pageWidth - margin, currentY); // Bottom separator line
 
-    // Official System Footer
-    const footerY = doc.internal.pageSize.getHeight() - 10;
-    doc.setFontSize(7);
-    doc.setTextColor(148, 163, 184);
-    doc.text("Generated Automatically by Chaitanya Dairy Management System", pageWidth / 2, footerY, { align: 'center' });
+    // --- 9. SIGNATURE SECTION ---
+    currentY += 35;
+    if (currentY > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        currentY = 40;
+    }
+
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.2);
+    
+    // Left signature
+    doc.line(margin, currentY, margin + 40, currentY);
+    doc.setFont("Roboto", "bold");
+    doc.text("Authorized Signature", margin, currentY + 5);
+
+    // Right signature
+    doc.line(pageWidth - margin - 40, currentY, pageWidth - margin, currentY);
+    doc.text("Manager's Approval", pageWidth - margin - 40, currentY + 5);
 
     // SAVE THE FILE
-    doc.save(`Summary_Report_${data.date}.pdf`);
+    doc.save(`Dairy_Ledger_Report_${data.date}.pdf`);
 };

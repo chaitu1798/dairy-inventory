@@ -50,6 +50,7 @@ const productSchema = z.object({
     categoryName: z.string().min(1, 'Category name is required'),
     unit: z.string().min(1, 'Unit is required'),
     price: z.coerce.number().min(0.01, 'Selling price must be greater than 0'),
+    distribution_price: z.coerce.number().min(0.01, 'Distribution price must be greater than 0').optional().or(z.literal('')),
     cost_price: z.coerce.number().min(0.01, 'Cost price must be greater than 0'),
     expiry_date: z.string().optional(),
     track_expiry: z.boolean().optional(),
@@ -191,6 +192,7 @@ export default function ProductsPage() {
                 name: '',
                 unit: '',
                 price: 0,
+                distribution_price: 0,
                 cost_price: 0,
                 categoryId: 'products',
                 categoryName: 'General Product',
@@ -214,6 +216,7 @@ export default function ProductsPage() {
             name: product.name,
             unit: product.unit,
             price: product.price,
+            distribution_price: product.distribution_price || 0,
             cost_price: product.cost_price || 0,
             categoryId: product.categoryId || product.category || 'products',
             categoryName: product.categoryName || getCategoryName(product.categoryId || product.category || 'products'),
@@ -250,6 +253,7 @@ export default function ProductsPage() {
             name: '',
             unit: '',
             price: 0,
+            distribution_price: 0,
             cost_price: 0,
             categoryId: 'products',
             categoryName: 'General Product',
@@ -416,7 +420,7 @@ export default function ProductsPage() {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <Input
                                         label="Cost Price"
                                         type="number"
@@ -428,11 +432,21 @@ export default function ProductsPage() {
                                         className="bg-white"
                                     />
                                     <Input
-                                        label="Sale Price"
+                                        label="Counter Price"
                                         type="number"
                                         step="0.01"
                                         {...register('price', { valueAsNumber: true })}
                                         error={errors.price}
+                                        placeholder="0.00"
+                                        startAdornment={<span className="text-slate-400 font-bold">₹</span>}
+                                        className="bg-white"
+                                    />
+                                    <Input
+                                        label="Dist. Price"
+                                        type="number"
+                                        step="0.01"
+                                        {...register('distribution_price', { valueAsNumber: true })}
+                                        error={errors.distribution_price}
                                         placeholder="0.00"
                                         startAdornment={<span className="text-slate-400 font-bold">₹</span>}
                                         className="bg-white"
@@ -585,9 +599,15 @@ export default function ProductsPage() {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="p-3 bg-slate-50/50 rounded-2xl border border-slate-100/50">
-                                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">MSRP</span>
-                                                        <span className="text-xl font-black text-slate-900">₹{product.price}</span>
+                                                    <div className="p-3 bg-slate-50/50 rounded-2xl border border-slate-100/50 flex flex-col gap-2">
+                                                        <div>
+                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Counter Price</span>
+                                                            <span className="text-sm font-black text-slate-900">₹{product.price}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Dist. Price</span>
+                                                            <span className="text-sm font-black text-slate-900">₹{product.distribution_price || product.price}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -650,7 +670,10 @@ export default function ProductsPage() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <span className="font-extrabold text-slate-900">₹{product.price}</span>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-extrabold text-slate-900">₹{product.price}</span>
+                                                            <span className="text-[10px] font-bold text-slate-400">Dist: ₹{product.distribution_price || product.price}</span>
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <div className="flex justify-end gap-1">

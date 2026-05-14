@@ -199,7 +199,21 @@ router.get('/daily', requireAuth, async (req, res) => {
             collections.waste.where('waste_date', '==', targetDate).get()
         ]);
 
-        const totalSales = sales.docs.reduce((acc, doc) => acc + (doc.data().total || 0), 0);
+        let totalSales = 0;
+        let totalCounterSales = 0;
+        let totalDistributionSales = 0;
+
+        sales.docs.forEach((doc) => {
+            const row = doc.data();
+            const total = row.total || 0;
+            totalSales += total;
+            if (row.sale_type === 'distribution') {
+                totalDistributionSales += total;
+            } else {
+                totalCounterSales += total;
+            }
+        });
+
         const totalPurchases = purchases.docs.reduce((acc, doc) => acc + (doc.data().total || 0), 0);
         const totalExpenses = expenses.docs.reduce((acc, doc) => acc + (doc.data().amount || 0), 0);
         const totalWaste = waste.docs.reduce((acc, doc) => acc + (doc.data().cost_value || 0), 0);
@@ -207,6 +221,8 @@ router.get('/daily', requireAuth, async (req, res) => {
         res.json({
             date: targetDate,
             total_sales: totalSales,
+            total_counter_sales: totalCounterSales,
+            total_distribution_sales: totalDistributionSales,
             total_purchases: totalPurchases,
             total_expenses: totalExpenses,
             total_waste: totalWaste,
@@ -266,6 +282,14 @@ router.get('/daily/details', requireAuth, async (req, res) => {
 
             const purchasedQty = sumByProduct(todayPurchases, product.id);
             const soldQty = sumByProduct(todaySales, product.id);
+            const distSalesItems = todaySales.filter(i => i.product_id === product.id && i.sale_type === 'distribution');
+            const distSoldQty = distSalesItems.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+            const distSalesValue = distSalesItems.reduce((acc, curr) => acc + (curr.total || 0), 0);
+            
+            const counterSalesItems = todaySales.filter(i => i.product_id === product.id && i.sale_type !== 'distribution');
+            const counterSoldQty = counterSalesItems.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+            const counterSalesValue = counterSalesItems.reduce((acc, curr) => acc + (curr.total || 0), 0);
+            
             const wastedQty = sumByProduct(todayWaste, product.id);
 
             const closingStock = openingStock + purchasedQty - soldQty - wastedQty;
@@ -284,9 +308,13 @@ router.get('/daily/details', requireAuth, async (req, res) => {
                 opening_stock: openingStock,
                 purchases_qty: purchasedQty,
                 sales_qty: soldQty,
+                counter_sales_qty: counterSoldQty,
+                distribution_sales_qty: distSoldQty,
                 closing_stock: closingStock,
                 total_purchase_value: purchaseValue,
                 total_sales_value: salesValue,
+                counter_sales_value: counterSalesValue,
+                distribution_sales_value: distSalesValue,
                 gross_profit: grossProfit,
                 notes: ''
             };

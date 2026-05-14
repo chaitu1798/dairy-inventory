@@ -194,7 +194,7 @@ router.get('/sales', requireAuth, async (req, res) => {
 
 router.post('/sales', requireAuth, validateRequest(SaleSchema), async (req, res) => {
     try {
-        const { product_id, quantity, sale_date, customer_id, status, due_date } = req.body;
+        const { product_id, quantity, sale_date, customer_id, status, due_date, sale_type } = req.body;
         const finalDueDate = due_date === '' ? null : due_date;
 
         const productDoc = await collections.products.doc(product_id).get();
@@ -202,8 +202,13 @@ router.post('/sales', requireAuth, validateRequest(SaleSchema), async (req, res)
             return res.status(400).json({ error: 'Product not found' });
         }
 
-        const price = productDoc.data()?.price || 0;
-        const total = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
+        const sType = sale_type || 'counter';
+        const priceToUse = sType === 'distribution' 
+            ? (productDoc.data()?.distribution_price || productDoc.data()?.price || 0)
+            : (productDoc.data()?.price || 0);
+
+        const price = priceToUse;
+        const total = (parseFloat(quantity) || 0) * (parseFloat(price as any) || 0);
         const invoice_number = `INV-${Date.now()}`;
 
         const newSale = {
@@ -212,6 +217,7 @@ router.post('/sales', requireAuth, validateRequest(SaleSchema), async (req, res)
             price: parseFloat(price) || 0,
             total,
             sale_date,
+            sale_type: sType,
             customer_id: customer_id || null,
             status: status || 'paid',
             due_date: finalDueDate || null,
@@ -240,7 +246,7 @@ router.post('/sales', requireAuth, validateRequest(SaleSchema), async (req, res)
 router.put('/sales/:id', requireAuth, validateRequest(SaleSchema), async (req, res) => {
     try {
         const { id } = req.params;
-        const { product_id, customer_id, quantity, price, sale_date, status, due_date } = req.body;
+        const { product_id, customer_id, quantity, price, sale_date, status, due_date, sale_type } = req.body;
 
         const updates: any = {};
         if (product_id !== undefined) updates.product_id = product_id;
@@ -248,13 +254,27 @@ router.put('/sales/:id', requireAuth, validateRequest(SaleSchema), async (req, r
         if (quantity !== undefined) updates.quantity = parseFloat(quantity as any);
         if (price !== undefined) updates.price = parseFloat(price as any);
         if (sale_date !== undefined) updates.sale_date = sale_date;
+        if (sale_type !== undefined) updates.sale_type = sale_type;
         if (status !== undefined) updates.status = status;
         if (due_date !== undefined) updates.due_date = due_date === '' ? null : due_date;
 
-        if (updates.quantity !== undefined || updates.price !== undefined) {
+        if (updates.quantity !== undefined || updates.price !== undefined || updates.sale_type !== undefined || updates.product_id !== undefined) {
             const currentDoc = await collections.sales.doc(id).get();
+            const pId = updates.product_id || currentDoc.data()?.product_id;
             const qty = updates.quantity !== undefined ? updates.quantity : currentDoc.data()?.quantity;
-            const prc = updates.price !== undefined ? updates.price : currentDoc.data()?.price;
+            let prc = updates.price !== undefined ? updates.price : currentDoc.data()?.price;
+
+            // If price wasn't explicitly provided, recalculate based on product and sale_type
+            if (updates.price === undefined) {
+                const sType = updates.sale_type || currentDoc.data()?.sale_type || 'counter';
+                const productDoc = await collections.products.doc(pId).get();
+                if (productDoc.exists) {
+                     prc = sType === 'distribution' 
+                        ? (productDoc.data()?.distribution_price || productDoc.data()?.price || 0)
+                        : (productDoc.data()?.price || 0);
+                     updates.price = prc;
+                }
+            }
             updates.total = qty * prc;
         }
 

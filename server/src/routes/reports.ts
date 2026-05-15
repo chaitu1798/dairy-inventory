@@ -99,7 +99,21 @@ const computeMonthlyRow = async (start: string, end: string) => {
         collections.waste.where('waste_date', '>=', start).where('waste_date', '<', end).get()
     ]);
 
-    const totalSales = salesSnapshot.docs.reduce((sum, doc) => sum + toNumber(doc.data().total), 0);
+    let totalSales = 0;
+    let totalCounterSales = 0;
+    let totalDistributionSales = 0;
+
+    salesSnapshot.docs.forEach((doc) => {
+        const row = doc.data();
+        const total = toNumber(row.total);
+        totalSales += total;
+        if (row.sale_type === 'distribution') {
+            totalDistributionSales += total;
+        } else {
+            totalCounterSales += total;
+        }
+    });
+
     const totalPurchases = purchaseSnapshot.docs.reduce((sum, doc) => sum + toNumber(doc.data().total), 0);
     const totalExpenses = expenseSnapshot.docs.reduce((sum, doc) => sum + toNumber(doc.data().amount), 0);
     const totalWaste = wasteSnapshot.docs.reduce((sum, doc) => sum + toNumber(doc.data().cost_value), 0);
@@ -107,6 +121,8 @@ const computeMonthlyRow = async (start: string, end: string) => {
     return {
         month: start,
         total_sales: totalSales,
+        total_counter_sales: totalCounterSales,
+        total_distribution_sales: totalDistributionSales,
         total_purchases: totalPurchases,
         total_expenses: totalExpenses,
         total_waste: totalWaste,

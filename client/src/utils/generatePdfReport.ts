@@ -73,22 +73,22 @@ export const generatePdfReport = async (data: PDFReportData) => {
     doc.setLineWidth(0.5);
     doc.rect(margin, currentY, pageWidth - margin * 2, 25);
     
-    // Company/Dairy Name at top center in bold red
+    // Company/Dairy Name at top center in modern slate
     doc.setFont("Roboto", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(220, 38, 38); // Red-600
+    doc.setFontSize(22);
+    doc.setTextColor(30, 41, 59); // Slate-800
     doc.text(data.companyName.toUpperCase(), pageWidth / 2, currentY + 8, { align: 'center' });
 
-    // Report title in blue bold text
-    doc.setFontSize(14);
-    doc.setTextColor(37, 99, 235); // Blue-600
+    // Report title in indigo text
+    doc.setFontSize(16);
+    doc.setTextColor(79, 70, 229); // Indigo-600
     doc.text(data.title.toUpperCase(), pageWidth / 2, currentY + 16, { align: 'center' });
 
     // Branch, Date, Generated timestamp
     doc.setFont("Roboto", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(0);
-    doc.text("Branch: Main Branch", margin + 5, currentY + 22);
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105); // Slate-500
+    doc.text("Branch: RM063", margin + 5, currentY + 22);
     doc.text(`Report Date: ${data.date}`, pageWidth / 2, currentY + 22, { align: 'center' });
     doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, pageWidth - margin - 5, currentY + 22, { align: 'right' });
 
@@ -101,19 +101,19 @@ export const generatePdfReport = async (data: PDFReportData) => {
     const totalDistQty = activeRecords.reduce((sum, r) => sum + (r.distribution_sales_qty || 0), 0);
 
     // --- 3. COMPACT SUMMARY SECTION ---
-    // Single-row summary table, light gray bg, bold labels
-    doc.setFillColor(241, 245, 249); // Slate-100
-    doc.rect(margin, currentY, pageWidth - margin * 2, 10, 'F');
-    doc.setDrawColor(0);
-    doc.rect(margin, currentY, pageWidth - margin * 2, 10);
+    // Single-row summary table, light indigo bg, bold labels
+    doc.setFillColor(238, 242, 255); // Indigo-50
+    doc.rect(margin, currentY, pageWidth - margin * 2, 12, 'F');
+    doc.setDrawColor(199, 210, 254); // Indigo-200
+    doc.rect(margin, currentY, pageWidth - margin * 2, 12);
     
     doc.setFont("Roboto", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(0);
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59); // Slate-800
     
     const summaryText = `Total Active Products: ${activeRecords.length}   |   Total Purchase Qty: ${totalPurchaseQty}   |   Counter Sales Qty: ${totalCounterQty}   |   Dist Sales Qty: ${totalDistQty}   |   Total Revenue: ₹${data.totals.total_sales_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}   |   Net Profit: ₹${data.totals.net_profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
     
-    doc.text(summaryText, pageWidth / 2, currentY + 6, { align: 'center' });
+    doc.text(summaryText, pageWidth / 2, currentY + 8, { align: 'center' });
 
     currentY += 15;
 
@@ -129,7 +129,6 @@ export const generatePdfReport = async (data: PDFReportData) => {
             { content: 'Distribution Sales', colSpan: 2, styles: { halign: 'center' } },
             { content: 'Total\nSold', rowSpan: 2 },
             { content: 'Closing\nStock', rowSpan: 2 },
-            { content: 'Unit\nPrice', rowSpan: 2 },
             { content: 'Total\nRevenue', rowSpan: 2 }
         ],
         [
@@ -178,7 +177,6 @@ export const generatePdfReport = async (data: PDFReportData) => {
             `₹${distVal.toFixed(2)}`,
             totalSold,
             closingStock,
-            `₹${(r.unit_price || 0).toFixed(2)}`,
             `₹${totalRev.toFixed(2)}`
         ];
     });
@@ -196,7 +194,6 @@ export const generatePdfReport = async (data: PDFReportData) => {
         `₹${sumDistValue.toFixed(2)}`, 
         sumTotalSold as any, 
         sumClosingStock as any, 
-        '', 
         `₹${sumTotalRevenue.toFixed(2)}`
     ]);
 
@@ -207,15 +204,15 @@ export const generatePdfReport = async (data: PDFReportData) => {
         theme: 'grid', // Accounting style
         styles: { 
             font: 'Roboto',
-            fontSize: 8,
-            cellPadding: 2,
-            lineColor: [0, 0, 0],
+            fontSize: 10,
+            cellPadding: 3,
+            lineColor: [203, 213, 225], // Slate-300
             lineWidth: 0.1,
-            textColor: 0
+            textColor: [15, 23, 42] // Slate-900
         },
         headStyles: {
-            fillColor: [241, 245, 249], // Light gray
-            textColor: 0,
+            fillColor: [248, 250, 252], // Slate-50
+            textColor: [30, 41, 59], // Slate-800
             fontStyle: 'bold',
             halign: 'center',
             valign: 'middle'
@@ -227,13 +224,14 @@ export const generatePdfReport = async (data: PDFReportData) => {
             1: { halign: 'left' } // Product Name left aligned
         },
         alternateRowStyles: {
-            fillColor: [250, 250, 250]
+            fillColor: [255, 255, 255]
         },
         willDrawCell: function(data) {
             // Check if it is the Totals row (the last row)
             if (data.row.index === tableRows.length - 1 && data.section === 'body') {
                 doc.setFont("Roboto", "bold");
-                doc.setFillColor(226, 232, 240); // Dark gray bg for totals
+                doc.setFillColor(241, 245, 249); // Slate-100 bg for totals
+                doc.setTextColor(15, 23, 42); // Slate-900
             }
         },
         didDrawPage: (data) => {
@@ -248,27 +246,30 @@ export const generatePdfReport = async (data: PDFReportData) => {
     }
 
     // --- 8. REVENUE SUMMARY FOOTER ---
-    doc.setDrawColor(0);
+    doc.setDrawColor(203, 213, 225); // Slate-300
     doc.setLineWidth(0.5);
     doc.line(margin, currentY, pageWidth - margin, currentY); // Top separator line
     
     currentY += 10;
     
     doc.setFont("Roboto", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59); // Slate-800
     doc.text("FINANCIAL SUMMARY:", margin, currentY);
     
-    currentY += 8;
+    currentY += 10;
     doc.setFont("Roboto", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(11);
     doc.text(`Total Revenue: ₹${data.totals.total_sales_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, margin, currentY);
-    doc.text(`Total Expenses: ₹${data.totals.total_expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, margin + 60, currentY);
+    doc.text(`Total Expenses: ₹${data.totals.total_expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, margin + 70, currentY);
     
     const profit = data.totals.net_profit;
     doc.setFont("Roboto", "bold");
-    doc.text(`Net Profit: ₹${profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, margin + 120, currentY);
+    doc.setTextColor(profit >= 0 ? 22 : 220, profit >= 0 ? 101 : 38, profit >= 0 ? 52 : 38); // Green-700 or Red-600
+    doc.text(`Net Profit: ₹${profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, margin + 140, currentY);
     
-    currentY += 5;
+    currentY += 6;
+    doc.setDrawColor(203, 213, 225); // Slate-300
     doc.line(margin, currentY, pageWidth - margin, currentY); // Bottom separator line
 
     // --- 9. SIGNATURE SECTION ---

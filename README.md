@@ -6,8 +6,8 @@ A complete full-stack application for managing dairy inventory, sales, purchases
 
 - **Backend**: Node.js, Express, TypeScript
 - **Frontend**: Next.js, TypeScript, Tailwind CSS
-- **Database**: Supabase (PostgreSQL)
-- **Auth**: Supabase Auth
+- **Database**: FIREBASE
+- **Auth**: google Auth
 
 ## Prerequisites
 

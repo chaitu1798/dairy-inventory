@@ -24,6 +24,8 @@ import { generatePdfReport } from '../../../utils/generatePdfReport';
 
 interface DailyStats {
     total_sales: number;
+    total_counter_sales?: number;
+    total_distribution_sales?: number;
     total_purchases: number;
     total_expenses: number;
     total_waste: number;
@@ -61,7 +63,7 @@ export default function DailyReportPage() {
             await generatePdfReport({
                 title: "Daily Inventory & Sales Report",
                 date: date,
-                companyName: "Dairy 01",
+                companyName: "Sri Vijaya Visakha Milk Producers Company",
                 summary: {
                     totalProducts: records.length,
                     totalPurchases: totals.total_purchase_value,
@@ -158,7 +160,7 @@ export default function DailyReportPage() {
             ) : (
                 <>
                     {/* Top Stats Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                         <StatCard
                             title="Gross Sales"
                             value={stats?.total_sales}
@@ -167,25 +169,32 @@ export default function DailyReportPage() {
                             delay={0}
                         />
                         <StatCard
-                            title="Inventory Purchases"
-                            value={stats?.total_purchases}
+                            title="Counter Sales"
+                            value={stats?.total_counter_sales || 0}
                             icon={ShoppingCart}
-                            type="neutral"
+                            type="positive"
                             delay={100}
                         />
                         <StatCard
-                            title="Operational Expenses"
-                            value={stats?.total_expenses}
-                            icon={DollarSign}
-                            type="negative"
+                            title="Dist. Sales"
+                            value={stats?.total_distribution_sales || 0}
+                            icon={Package}
+                            type="positive"
                             delay={200}
                         />
                         <StatCard
-                            title="Shrinkage & Waste"
-                            value={stats?.total_waste}
-                            icon={Trash2}
-                            type="negative"
+                            title="Inv. Purchases"
+                            value={stats?.total_purchases}
+                            icon={ShoppingCart}
+                            type="neutral"
                             delay={300}
+                        />
+                        <StatCard
+                            title="Op. Expenses"
+                            value={stats?.total_expenses}
+                            icon={DollarSign}
+                            type="negative"
+                            delay={400}
                         />
                     </div>
 
@@ -210,7 +219,12 @@ export default function DailyReportPage() {
                                                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
                                                 <span className="font-bold text-slate-700">Gross Sales Revenue</span>
                                             </div>
-                                            <span className="text-lg font-black text-emerald-600">+ ₹{stats?.total_sales?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            <div className="text-right">
+                                                <span className="text-lg font-black text-emerald-600">+ ₹{stats?.total_sales?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                <div className="text-[10px] font-bold text-slate-400 mt-1">
+                                                    Counter: ₹{(stats?.total_counter_sales || 0).toLocaleString()} • Dist: ₹{(stats?.total_distribution_sales || 0).toLocaleString()}
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <div className="flex justify-between items-center p-4 rounded-2xl bg-slate-50/50 border border-slate-100 transition-colors hover:bg-slate-50">

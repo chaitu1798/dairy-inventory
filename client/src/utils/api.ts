@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { getApiBaseUrl } from './apiBaseUrl';
+import { auth } from '../lib/firebase';
+import { getIdToken } from 'firebase/auth';
 
 const baseURL = getApiBaseUrl();
 
@@ -20,7 +22,7 @@ if (api.defaults.baseURL?.endsWith('/api/')) {
 }
 
 // Request interceptor to add Auth token
-api.interceptors.request.use(request => {
+api.interceptors.request.use(async (request) => {
     // Dispatch event to show global spinner
     if (typeof globalThis.window !== 'undefined') {
         globalThis.window.dispatchEvent(new Event('axios-request-start'));
@@ -33,7 +35,20 @@ api.interceptors.request.use(request => {
     // Add Authorization header if user is logged in
     if (typeof globalThis.window !== 'undefined') {
         try {
-            const userStr = localStorage.getItem('dairy_user');
+            let userStr = localStorage.getItem('dairy_user');
+
+            // Fallback for hosted environments: use Firebase current user if legacy storage is missing.
+            if (!userStr && auth.currentUser) {
+                const freshToken = await getIdToken(auth.currentUser, false);
+                const fallbackUser = {
+                    uid: auth.currentUser.uid,
+                    email: auth.currentUser.email,
+                    access_token: freshToken
+                };
+                localStorage.setItem('dairy_user', JSON.stringify(fallbackUser));
+                userStr = JSON.stringify(fallbackUser);
+            }
+
             if (userStr) {
                 const userData = JSON.parse(userStr);
 

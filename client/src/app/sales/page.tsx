@@ -58,6 +58,8 @@ const salesSchema = z.object({
 
 type SalesFormData = z.infer<typeof salesSchema>;
 
+type SaleType = 'counter' | 'distribution';
+
 export default function SalesPage() {
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const { products: filteredProducts, loading: productsLoading } = useFilteredProducts(selectedCategoryId);
@@ -73,6 +75,7 @@ export default function SalesPage() {
     // UI State
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
+    const [saleType, setSaleType] = useState<SaleType>('counter');
     const [dateRange, setDateRange] = useState({
         startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0]
@@ -169,6 +172,7 @@ export default function SalesPage() {
         try {
             const payload = {
                 ...data,
+                sale_type: saleType,
                 customer_id: data.customer_id || null,
                 due_date: data.status === 'pending' ? data.due_date : null
             };
@@ -211,6 +215,7 @@ export default function SalesPage() {
         
         setIsEditing(true);
         setEditId(sale.id);
+        setSaleType(sale.sale_type || 'counter');
         reset({
             categoryId: catId,
             product_id: String(sale.product_id),
@@ -226,6 +231,7 @@ export default function SalesPage() {
     const handleCancelEdit = () => {
         setIsEditing(false);
         setEditId(null);
+        setSaleType('counter');
         setSelectedCategoryId('');
         reset({
             categoryId: '',
@@ -294,6 +300,20 @@ export default function SalesPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
+                            <div className="flex bg-slate-100 p-1 rounded-2xl mb-6">
+                                <button 
+                                    className={cn("flex-1 text-sm font-bold py-2 rounded-xl transition-all", saleType === 'counter' ? "bg-white shadow-sm text-primary" : "text-slate-500")}
+                                    onClick={() => setSaleType('counter')}
+                                >
+                                    Counter Sale
+                                </button>
+                                <button 
+                                    className={cn("flex-1 text-sm font-bold py-2 rounded-xl transition-all", saleType === 'distribution' ? "bg-white shadow-sm text-primary" : "text-slate-500")}
+                                    onClick={() => setSaleType('distribution')}
+                                >
+                                    Distribution Sale
+                                </button>
+                            </div>
                             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                                 <Select
                                     label="Product Category"
@@ -458,6 +478,7 @@ export default function SalesPage() {
                             <TableHeader>
                                 <TableRow className="hover:bg-transparent">
                                     <TableHead>Date & ID</TableHead>
+                                    <TableHead>Type</TableHead>
                                     <TableHead>Customer</TableHead>
                                     <TableHead>Product Details</TableHead>
                                     <TableHead className="text-right">Amount</TableHead>
@@ -494,6 +515,11 @@ export default function SalesPage() {
                                                     <span className="text-slate-900 font-bold">{new Date(sale.sale_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
                                                     <span className="text-[10px] font-bold text-slate-400">ID: #{sale.id.toString().padStart(4, '0')}</span>
                                                 </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant={sale.sale_type === 'distribution' ? 'secondary' : 'outline'} className="text-[10px]">
+                                                    {sale.sale_type === 'distribution' ? 'DISTRIBUTION' : 'COUNTER'}
+                                                </Badge>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">

@@ -100,6 +100,7 @@ router.post('/', requireAuth, validateRequest(ProductSchema), async (req, res) =
             categoryName,
             unit, 
             price, 
+            distribution_price,
             cost_price, 
             low_stock_threshold, 
             reorder_level,
@@ -114,6 +115,7 @@ router.post('/', requireAuth, validateRequest(ProductSchema), async (req, res) =
             category: categoryId, // Keep for backward compatibility
             unit: unit || 'unit',
             price: parseFloat(price as any) || 0,
+            distribution_price: parseFloat(distribution_price as any) || 0,
             cost_price: parseFloat(cost_price as any) || 0,
             min_stock: parseInt((low_stock_threshold || reorder_level) as any) || 10,
             track_expiry: !!track_expiry,
@@ -139,6 +141,7 @@ router.put('/:id', requireAuth, validateRequest(ProductSchema), async (req, res)
             categoryName,
             unit, 
             price, 
+            distribution_price,
             cost_price, 
             low_stock_threshold, 
             reorder_level,
@@ -155,6 +158,7 @@ router.put('/:id', requireAuth, validateRequest(ProductSchema), async (req, res)
         if (categoryName !== undefined) updates.categoryName = categoryName;
         if (unit !== undefined) updates.unit = unit;
         if (price !== undefined) updates.price = parseFloat(price as any);
+        if (distribution_price !== undefined) updates.distribution_price = parseFloat(distribution_price as any);
         if (cost_price !== undefined) updates.cost_price = parseFloat(cost_price as any);
         if (low_stock_threshold !== undefined || reorder_level !== undefined) {
             updates.min_stock = parseInt((low_stock_threshold || reorder_level) as any);

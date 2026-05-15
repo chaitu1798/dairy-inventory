@@ -31,6 +31,7 @@ export const SaleSchema = z.object({
         customer_id: z.union([z.string(), z.number()]).nullable().optional(),
         quantity: z.number(),
         sale_date: z.string().optional(),
+        sale_type: z.enum(['counter', 'distribution']).optional(),
         status: z.enum(['paid', 'pending', 'overdue']).optional(),
         due_date: z.string().nullable().optional(),
         // Support old fields for compatibility
@@ -60,6 +61,7 @@ export const ProductSchema = z.object({
         unit: z.string().min(1, 'Unit is required'),
         cost_price: z.number().optional(),
         price: z.number().optional(),
+        distribution_price: z.number().optional(),
         stock: z.number().optional(),
         current_stock: z.number().optional(),
         low_stock_threshold: z.number().optional(),

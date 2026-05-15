@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { auth } from '../../lib/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, getIdToken } from 'firebase/auth';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -38,6 +38,13 @@ export default function LoginPage() {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
             if (userCredential.user) {
+                // Ensure token is available before redirecting so first protected API calls don't 401.
+                const token = await getIdToken(userCredential.user, true);
+                localStorage.setItem('dairy_user', JSON.stringify({
+                    uid: userCredential.user.uid,
+                    email: userCredential.user.email,
+                    access_token: token
+                }));
                 toast.success('Access granted. Welcome to Dairy OS.');
                 login();
             }

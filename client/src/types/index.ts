@@ -12,6 +12,7 @@ export interface Product {
     type?: string;     // Legacy
     unit: string;
     price: number;
+    distribution_price?: number;
     cost_price?: number;
     min_stock?: number;
     low_stock_threshold?: number;
@@ -46,6 +47,7 @@ export interface Sale {
     price: number;
     total: number;
     sale_date: string;
+    sale_type?: 'counter' | 'distribution';
     status: 'paid' | 'pending' | 'overdue';
     due_date: string | null;
     amount_paid: number;

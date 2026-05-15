@@ -11,7 +11,8 @@ import {
     Calendar,
     ArrowUpRight,
     ArrowDownRight,
-    BarChart3
+    BarChart3,
+    Package
 } from 'lucide-react';
 import { Card, CardContent } from '../../../components/ui/Card';
 import { cn } from '../../../lib/utils';
@@ -27,6 +28,8 @@ import {
 interface MonthlyReportData {
     month: string;
     total_sales?: number;
+    total_counter_sales?: number;
+    total_distribution_sales?: number;
     total_purchases?: number;
     total_expenses?: number;
     total_waste?: number;
@@ -56,6 +59,8 @@ export default function MonthlyReportPage() {
     }, [month, year, fetchReport]);
 
     const totalSales = reportData.reduce((acc, curr) => acc + (curr.total_sales || 0), 0);
+    const totalCounterSales = reportData.reduce((acc, curr) => acc + (curr.total_counter_sales || 0), 0);
+    const totalDistributionSales = reportData.reduce((acc, curr) => acc + (curr.total_distribution_sales || 0), 0);
     const totalPurchases = reportData.reduce((acc, curr) => acc + (curr.total_purchases || 0), 0);
     const totalExpenses = reportData.reduce((acc, curr) => acc + (curr.total_expenses || 0), 0);
     const totalWaste = reportData.reduce((acc, curr) => acc + (curr.total_waste || 0), 0);
@@ -133,7 +138,7 @@ export default function MonthlyReportPage() {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                         <StatCard
                             title="Gross Revenue"
                             value={totalSales}
@@ -142,25 +147,39 @@ export default function MonthlyReportPage() {
                             delay={0}
                         />
                         <StatCard
+                            title="Counter Sales"
+                            value={totalCounterSales}
+                            icon={ShoppingCart}
+                            type="positive"
+                            delay={100}
+                        />
+                        <StatCard
+                            title="Dist. Sales"
+                            value={totalDistributionSales}
+                            icon={Package}
+                            type="positive"
+                            delay={200}
+                        />
+                        <StatCard
                             title="Total Investments"
                             value={totalPurchases}
                             icon={ShoppingCart}
                             type="neutral"
-                            delay={100}
+                            delay={300}
                         />
                         <StatCard
                             title="Operating Costs"
                             value={totalExpenses}
                             icon={DollarSign}
                             type="negative"
-                            delay={200}
+                            delay={400}
                         />
                         <StatCard
                             title="Asset Shrinkage"
                             value={totalWaste}
                             icon={Trash2}
                             type="negative"
-                            delay={300}
+                            delay={500}
                         />
                     </div>
 
@@ -217,7 +236,9 @@ export default function MonthlyReportPage() {
                                         <TableHeader>
                                             <TableRow className="hover:bg-transparent">
                                                 <TableHead>Period</TableHead>
-                                                <TableHead className="text-right">Sales Revenue</TableHead>
+                                                <TableHead className="text-right">Gross Revenue</TableHead>
+                                                <TableHead className="text-right">Counter</TableHead>
+                                                <TableHead className="text-right">Distribution</TableHead>
                                                 <TableHead className="text-right">Procurement</TableHead>
                                                 <TableHead className="text-right">Expenditure</TableHead>
                                                 <TableHead className="text-right">Loss/Shrinkage</TableHead>
@@ -232,6 +253,12 @@ export default function MonthlyReportPage() {
                                                     </TableCell>
                                                     <TableCell className="text-right font-black text-emerald-600">
                                                         ₹{row.total_sales?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-semibold text-emerald-500">
+                                                        ₹{row.total_counter_sales?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-semibold text-emerald-500">
+                                                        ₹{row.total_distribution_sales?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                     </TableCell>
                                                     <TableCell className="text-right font-semibold text-blue-600">
                                                         ₹{row.total_purchases?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -254,7 +281,7 @@ export default function MonthlyReportPage() {
                                             ))}
                                             {reportData.length === 0 && (
                                                 <TableRow>
-                                                    <TableCell colSpan={6} className="py-20 text-center">
+                                                    <TableCell colSpan={8} className="py-20 text-center">
                                                         <div className="flex flex-col items-center gap-4">
                                                             <div className="p-4 rounded-full bg-slate-50 text-slate-200">
                                                                 <BarChart3 className="w-8 h-8" />

@@ -40,6 +40,12 @@ export default function LoginPage() {
             if (userCredential.user) {
                 // Ensure token is available before redirecting so first protected API calls don't 401.
                 const token = await getIdToken(userCredential.user, true);
+                
+                // Set cookie for middleware protection
+                if (typeof document !== 'undefined') {
+                    document.cookie = `dairy_session=${token}; path=/; max-age=3600; SameSite=Lax`;
+                }
+
                 localStorage.setItem('dairy_user', JSON.stringify({
                     uid: userCredential.user.uid,
                     email: userCredential.user.email,

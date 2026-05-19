@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const firebase_1 = require("../firebase");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 // Firebase Auth mostly happens on the client, so these routes are for backend operations if needed.
 router.post('/signup', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -39,4 +40,14 @@ router.post('/logout', (req, res) => __awaiter(void 0, void 0, void 0, function*
     // Stateless auth with Firebase ID tokens, client just needs to discard the token.
     res.json({ message: 'Logged out successfully' });
 }));
+/**
+ * Verifies the current token and returns user info.
+ * Requirement #3: Verify token validity with backend.
+ */
+router.get('/verify', auth_1.requireAuth, (req, res) => {
+    res.json({
+        valid: true,
+        user: req.user
+    });
+});
 exports.default = router;

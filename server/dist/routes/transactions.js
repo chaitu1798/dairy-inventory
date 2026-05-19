@@ -193,15 +193,19 @@ router.get('/sales', auth_1.requireAuth, (req, res) => __awaiter(void 0, void 0,
     }
 }));
 router.post('/sales', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(schemas_1.SaleSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b, _c;
     try {
-        const { product_id, quantity, sale_date, customer_id, status, due_date } = req.body;
+        const { product_id, quantity, sale_date, customer_id, status, due_date, sale_type } = req.body;
         const finalDueDate = due_date === '' ? null : due_date;
         const productDoc = yield firebase_1.collections.products.doc(product_id).get();
         if (!productDoc.exists) {
             return res.status(400).json({ error: 'Product not found' });
         }
-        const price = ((_a = productDoc.data()) === null || _a === void 0 ? void 0 : _a.price) || 0;
+        const sType = sale_type || 'counter';
+        const priceToUse = sType === 'distribution'
+            ? (((_a = productDoc.data()) === null || _a === void 0 ? void 0 : _a.distribution_price) || ((_b = productDoc.data()) === null || _b === void 0 ? void 0 : _b.price) || 0)
+            : (((_c = productDoc.data()) === null || _c === void 0 ? void 0 : _c.price) || 0);
+        const price = priceToUse;
         const total = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
         const invoice_number = `INV-${Date.now()}`;
         const newSale = {
@@ -210,6 +214,7 @@ router.post('/sales', auth_1.requireAuth, (0, validateRequest_1.validateRequest)
             price: parseFloat(price) || 0,
             total,
             sale_date,
+            sale_type: sType,
             customer_id: customer_id || null,
             status: status || 'paid',
             due_date: finalDueDate || null,
@@ -233,10 +238,10 @@ router.post('/sales', auth_1.requireAuth, (0, validateRequest_1.validateRequest)
     }
 }));
 router.put('/sales/:id', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(schemas_1.SaleSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g;
     try {
         const { id } = req.params;
-        const { product_id, customer_id, quantity, price, sale_date, status, due_date } = req.body;
+        const { product_id, customer_id, quantity, price, sale_date, status, due_date, sale_type } = req.body;
         const updates = {};
         if (product_id !== undefined)
             updates.product_id = product_id;
@@ -248,14 +253,28 @@ router.put('/sales/:id', auth_1.requireAuth, (0, validateRequest_1.validateReque
             updates.price = parseFloat(price);
         if (sale_date !== undefined)
             updates.sale_date = sale_date;
+        if (sale_type !== undefined)
+            updates.sale_type = sale_type;
         if (status !== undefined)
             updates.status = status;
         if (due_date !== undefined)
             updates.due_date = due_date === '' ? null : due_date;
-        if (updates.quantity !== undefined || updates.price !== undefined) {
+        if (updates.quantity !== undefined || updates.price !== undefined || updates.sale_type !== undefined || updates.product_id !== undefined) {
             const currentDoc = yield firebase_1.collections.sales.doc(id).get();
-            const qty = updates.quantity !== undefined ? updates.quantity : (_a = currentDoc.data()) === null || _a === void 0 ? void 0 : _a.quantity;
-            const prc = updates.price !== undefined ? updates.price : (_b = currentDoc.data()) === null || _b === void 0 ? void 0 : _b.price;
+            const pId = updates.product_id || ((_a = currentDoc.data()) === null || _a === void 0 ? void 0 : _a.product_id);
+            const qty = updates.quantity !== undefined ? updates.quantity : (_b = currentDoc.data()) === null || _b === void 0 ? void 0 : _b.quantity;
+            let prc = updates.price !== undefined ? updates.price : (_c = currentDoc.data()) === null || _c === void 0 ? void 0 : _c.price;
+            // If price wasn't explicitly provided, recalculate based on product and sale_type
+            if (updates.price === undefined) {
+                const sType = updates.sale_type || ((_d = currentDoc.data()) === null || _d === void 0 ? void 0 : _d.sale_type) || 'counter';
+                const productDoc = yield firebase_1.collections.products.doc(pId).get();
+                if (productDoc.exists) {
+                    prc = sType === 'distribution'
+                        ? (((_e = productDoc.data()) === null || _e === void 0 ? void 0 : _e.distribution_price) || ((_f = productDoc.data()) === null || _f === void 0 ? void 0 : _f.price) || 0)
+                        : (((_g = productDoc.data()) === null || _g === void 0 ? void 0 : _g.price) || 0);
+                    updates.price = prc;
+                }
+            }
             updates.total = qty * prc;
         }
         yield firebase_1.collections.sales.doc(id).update(updates);

@@ -85,7 +85,7 @@ router.get('/', auth_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void
 }));
 router.post('/', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(schemas_1.ProductSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { name, categoryId, categoryName, unit, price, cost_price, low_stock_threshold, reorder_level, track_expiry, expiry_date } = req.body;
+        const { name, categoryId, categoryName, unit, price, distribution_price, cost_price, low_stock_threshold, reorder_level, track_expiry, expiry_date } = req.body;
         const newProduct = {
             name,
             categoryId,
@@ -93,6 +93,7 @@ router.post('/', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(sche
             category: categoryId, // Keep for backward compatibility
             unit: unit || 'unit',
             price: parseFloat(price) || 0,
+            distribution_price: parseFloat(distribution_price) || 0,
             cost_price: parseFloat(cost_price) || 0,
             min_stock: parseInt((low_stock_threshold || reorder_level)) || 10,
             track_expiry: !!track_expiry,
@@ -110,7 +111,7 @@ router.post('/', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(sche
 router.put('/:id', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(schemas_1.ProductSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { name, categoryId, categoryName, unit, price, cost_price, low_stock_threshold, reorder_level, track_expiry, expiry_date } = req.body;
+        const { name, categoryId, categoryName, unit, price, distribution_price, cost_price, low_stock_threshold, reorder_level, track_expiry, expiry_date } = req.body;
         const updates = {};
         if (name !== undefined)
             updates.name = name;
@@ -124,6 +125,8 @@ router.put('/:id', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(sc
             updates.unit = unit;
         if (price !== undefined)
             updates.price = parseFloat(price);
+        if (distribution_price !== undefined)
+            updates.distribution_price = parseFloat(distribution_price);
         if (cost_price !== undefined)
             updates.cost_price = parseFloat(cost_price);
         if (low_stock_threshold !== undefined || reorder_level !== undefined) {

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { useRouter } from 'next/navigation';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged, signOut, User, getIdToken } from 'firebase/auth';
+import api from '../utils/api';
 
 interface AuthUser extends User {
     role?: string;
@@ -29,30 +30,60 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
+    // Helper to manage session cookie for Next.js Middleware
+    const setSessionCookie = (token: string | null) => {
+        if (typeof document !== 'undefined') {
+            if (token) {
+                document.cookie = `dairy_session=${token}; path=/; max-age=3600; SameSite=Lax`;
+            } else {
+                document.cookie = 'dairy_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            }
+        }
+    };
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
                 try {
                     const token = await getIdToken(firebaseUser, true);
-                    const authUser: AuthUser = {
-                        ...firebaseUser,
-                        access_token: token
-                    } as AuthUser;
+                    
+                    // Requirement #3: Verify token validity with the backend
+                    try {
+                        // We pass the token explicitly in case localStorage isn't updated yet
+                        await api.get('/auth/verify', {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
 
-                    setUser(authUser);
-                    // Maintain legacy storage for API interceptor compatibility (api.ts)
-                    localStorage.setItem('dairy_user', JSON.stringify({
-                        uid: firebaseUser.uid,
-                        email: firebaseUser.email,
-                        access_token: token
-                    }));
+                        const authUser: AuthUser = {
+                            ...firebaseUser,
+                            access_token: token
+                        } as AuthUser;
+
+                        setUser(authUser);
+                        setSessionCookie(token);
+
+                        // Maintain legacy storage for API interceptor compatibility (api.ts)
+                        localStorage.setItem('dairy_user', JSON.stringify({
+                            uid: firebaseUser.uid,
+                            email: firebaseUser.email,
+                            access_token: token
+                        }));
+                    } catch (verifyError) {
+                        console.error('Backend token verification failed:', verifyError);
+                        setUser(null);
+                        setSessionCookie(null);
+                        localStorage.removeItem('dairy_user');
+                        await signOut(auth);
+                    }
                 } catch (error) {
                     console.error('Error getting Firebase token:', error);
                     setUser(null);
+                    setSessionCookie(null);
                     localStorage.removeItem('dairy_user');
                 }
             } else {
                 setUser(null);
+                setSessionCookie(null);
                 localStorage.removeItem('dairy_user');
                 localStorage.removeItem('dairy_login_timestamp');
             }
@@ -70,6 +101,7 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
         }
 
         setUser(null);
+        setSessionCookie(null);
         localStorage.removeItem('dairy_user');
         localStorage.removeItem('dairy_login_timestamp');
 
@@ -81,8 +113,6 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
     }, [router]);
 
     const login = useCallback(() => {
-        // This is now mostly handled by onAuthStateChanged after the actual login call
-        // But we can use it to force a redirect if needed
         router.push('/dashboard');
     }, [router]);
 

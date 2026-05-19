@@ -100,6 +100,8 @@ api.interceptors.response.use(
             if (typeof globalThis.window !== 'undefined') {
                 localStorage.removeItem('dairy_user');
                 localStorage.removeItem('dairy_login_timestamp');
+                // Clear session cookie
+                document.cookie = 'dairy_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
                 globalThis.window.location.href = '/login';
             }
         }

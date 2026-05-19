@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { auth } from '../firebase';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
@@ -31,6 +32,17 @@ router.post('/login', async (req, res) => {
 router.post('/logout', async (req, res) => {
     // Stateless auth with Firebase ID tokens, client just needs to discard the token.
     res.json({ message: 'Logged out successfully' });
+});
+
+/**
+ * Verifies the current token and returns user info.
+ * Requirement #3: Verify token validity with backend.
+ */
+router.get('/verify', requireAuth, (req, res) => {
+    res.json({ 
+        valid: true, 
+        user: (req as any).user 
+    });
 });
 
 export default router;

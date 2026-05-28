@@ -145,9 +145,9 @@ export default function AccountsReceivablePage() {
                             </div>
                             <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Total Owed</Badge>
                         </div>
-                        <div>
-                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Receivable</p>
-                            <h3 className="text-4xl font-black text-slate-900 tracking-tight">₹{stats.totalReceivable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                        <div className="overflow-hidden">
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1 truncate">Total Receivable</p>
+                            <h3 className="text-4xl font-black text-slate-900 tracking-tight truncate">₹{stats.totalReceivable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
                         </div>
                     </CardContent>
                 </Card>
@@ -161,9 +161,9 @@ export default function AccountsReceivablePage() {
                             </div>
                             <Badge variant="outline" className="text-rose-600 border-rose-200 bg-rose-50">Critical</Badge>
                         </div>
-                        <div>
-                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Overdue Amount</p>
-                            <h3 className="text-4xl font-black text-rose-600 tracking-tight">₹{stats.overdueAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                        <div className="overflow-hidden">
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1 truncate">Overdue Amount</p>
+                            <h3 className="text-4xl font-black text-rose-600 tracking-tight truncate">₹{stats.overdueAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
                         </div>
                     </CardContent>
                 </Card>
@@ -177,9 +177,9 @@ export default function AccountsReceivablePage() {
                             </div>
                             <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">Pending</Badge>
                         </div>
-                        <div>
-                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Current Receivables</p>
-                            <h3 className="text-4xl font-black text-amber-600 tracking-tight">₹{stats.pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                        <div className="overflow-hidden">
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1 truncate">Current Receivables</p>
+                            <h3 className="text-4xl font-black text-amber-600 tracking-tight truncate">₹{stats.pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
                         </div>
                     </CardContent>
                 </Card>

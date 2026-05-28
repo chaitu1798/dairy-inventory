@@ -64,7 +64,7 @@ export default function MonthlyReportPage() {
     const totalPurchases = reportData.reduce((acc, curr) => acc + (curr.total_purchases || 0), 0);
     const totalExpenses = reportData.reduce((acc, curr) => acc + (curr.total_expenses || 0), 0);
     const totalWaste = reportData.reduce((acc, curr) => acc + (curr.total_waste || 0), 0);
-    const netProfit = totalSales - totalPurchases - totalExpenses - totalWaste;
+    const netProfit = totalSales - totalPurchases - totalExpenses;
 
     const StatCard = ({ title, value, icon: Icon, type, delay }: { title: string; value?: number; icon: React.ElementType; type: 'positive' | 'negative' | 'neutral' | 'accent', delay: number }) => {
         const typeStyles = {
@@ -86,9 +86,9 @@ export default function MonthlyReportPage() {
                     {type === 'positive' && <ArrowUpRight className="w-5 h-5 text-emerald-500" />}
                     {type === 'negative' && <ArrowDownRight className="w-5 h-5 text-rose-500" />}
                 </div>
-                <div>
-                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">{title}</p>
-                    <h3 className="text-3xl font-black text-slate-900 tracking-tight">₹{value?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}</h3>
+                <div className="overflow-hidden">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1 truncate">{title}</p>
+                    <h3 className="text-3xl font-black text-slate-900 tracking-tight truncate">₹{value?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}</h3>
                 </div>
             </div>
         );

@@ -278,9 +278,9 @@ export default function SalesPage() {
                         <div className="p-2 rounded-xl bg-white text-emerald-600 shadow-sm">
                             <ArrowUpRight className="w-5 h-5" />
                         </div>
-                        <div>
-                            <p className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest leading-none mb-1">Total Sales</p>
-                            <h4 className="text-lg font-black text-slate-900 leading-none">₹{sales.reduce((acc, sale) => acc + (sale.quantity * sale.price), 0).toLocaleString()}</h4>
+                        <div className="overflow-hidden">
+                            <p className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest truncate mb-1">Total Sales</p>
+                            <h4 className="text-lg font-black text-slate-900 truncate">₹{sales.reduce((acc, sale) => acc + (sale.quantity * sale.price), 0).toLocaleString()}</h4>
                         </div>
                     </Card>
                 </div>

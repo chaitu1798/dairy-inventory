@@ -170,8 +170,8 @@ export default function CustomersPage() {
                             <Shield className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-indigo-600/60 uppercase tracking-widest leading-none mb-1">Total Credit Extended</p>
-                            <h4 className="text-lg font-black text-slate-900 leading-none">₹{totalCreditLimit.toLocaleString()}</h4>
+                            <p className="text-[10px] font-black text-indigo-600/60 uppercase tracking-widest truncate mb-1">Total Credit Extended</p>
+                            <h4 className="text-lg font-black text-slate-900 truncate">₹{totalCreditLimit.toLocaleString()}</h4>
                         </div>
                     </Card>
                 </div>

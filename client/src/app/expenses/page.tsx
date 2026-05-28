@@ -189,8 +189,8 @@ export default function ExpensesPage() {
                             <TrendingDown className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-rose-600/50 uppercase tracking-widest leading-none mb-1">Total Outflow</p>
-                            <h4 className="text-lg font-black text-slate-900 leading-none">₹{totalExpenseAmount.toLocaleString()}</h4>
+                            <p className="text-[10px] font-black text-rose-600/50 uppercase tracking-widest truncate mb-1">Total Outflow</p>
+                            <h4 className="text-lg font-black text-slate-900 truncate">₹{totalExpenseAmount.toLocaleString()}</h4>
                         </div>
                     </Card>
                 </div>

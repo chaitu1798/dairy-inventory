@@ -105,9 +105,9 @@ export default function DailyReportPage() {
                     {type === 'positive' && <ArrowUpRight className="w-5 h-5 text-emerald-500" />}
                     {type === 'negative' && <ArrowDownRight className="w-5 h-5 text-rose-500" />}
                 </div>
-                <div>
-                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">{title}</p>
-                    <h3 className="text-3xl font-black text-slate-900 tracking-tight">₹{value?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}</h3>
+                <div className="overflow-hidden">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1 truncate">{title}</p>
+                    <h3 className="text-3xl font-black text-slate-900 tracking-tight truncate">₹{value?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}</h3>
                 </div>
             </div>
         );
@@ -243,12 +243,15 @@ export default function DailyReportPage() {
                                             <span className="text-lg font-black text-rose-600">- ₹{stats?.total_expenses?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                         </div>
 
-                                        <div className="flex justify-between items-center p-4 rounded-2xl bg-slate-50/50 border border-slate-100 transition-colors hover:bg-slate-50">
+                                        <div className="flex justify-between items-center p-4 rounded-2xl bg-slate-50/50 border border-slate-100 transition-colors hover:bg-slate-50 opacity-70">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-2 h-2 rounded-full bg-amber-500" />
-                                                <span className="font-bold text-slate-700">Shrinkage & Waste Loss</span>
+                                                <div className="w-2 h-2 rounded-full bg-slate-400" />
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-slate-500">Shrinkage & Waste Loss</span>
+                                                    <span className="text-[10px] font-bold text-slate-400">Cost absorbed in Purchases</span>
+                                                </div>
                                             </div>
-                                            <span className="text-lg font-black text-amber-600">- ₹{stats?.total_waste?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            <span className="text-lg font-black text-slate-400">₹{stats?.total_waste?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                         </div>
                                     </div>
                                 </CardContent>

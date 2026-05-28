@@ -148,13 +148,13 @@ export default function SignupPage() {
                         <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-500 ring-1 ring-emerald-500/10 group-hover:scale-110 transition-transform">
                             <ShieldCheck className="w-4 h-4" />
                         </div>
-                        <p className="text-[11px] font-black uppercase tracking-widest leading-none">Military Encryption</p>
+                        <p className="text-[11px] font-black uppercase tracking-widest truncate">Military Encryption</p>
                     </div>
                     <div className="flex items-center gap-2.5 text-slate-400 group">
                         <div className="p-1.5 rounded-lg bg-blue-50 text-blue-500 ring-1 ring-blue-500/10 group-hover:scale-110 transition-transform">
                             <Sparkles className="w-4 h-4" />
                         </div>
-                        <p className="text-[11px] font-black uppercase tracking-widest leading-none">Smart Analytics</p>
+                        <p className="text-[11px] font-black uppercase tracking-widest truncate">Smart Analytics</p>
                     </div>
                 </div>
             </div>

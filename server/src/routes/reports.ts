@@ -126,7 +126,7 @@ const computeMonthlyRow = async (start: string, end: string) => {
         total_purchases: totalPurchases,
         total_expenses: totalExpenses,
         total_waste: totalWaste,
-        profit: totalSales - totalPurchases - totalExpenses - totalWaste
+        profit: totalSales - totalPurchases - totalExpenses
     };
 };
 
@@ -190,7 +190,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
                 total_purchases: totalPurchases,
                 total_expenses: totalExpenses,
                 total_waste: totalWaste,
-                net: totalSales - totalPurchases - totalExpenses - totalWaste
+                net: totalSales - totalPurchases - totalExpenses
             },
             total_stock_value: totalStockValue,
             low_stock_count: lowStockCount,
@@ -242,8 +242,8 @@ router.get('/daily', requireAuth, async (req, res) => {
             total_purchases: totalPurchases,
             total_expenses: totalExpenses,
             total_waste: totalWaste,
-            profit: totalSales - totalPurchases - totalExpenses - totalWaste,
-            net: totalSales - totalPurchases - totalExpenses - totalWaste
+            profit: totalSales - totalPurchases - totalExpenses,
+            net: totalSales - totalPurchases - totalExpenses
         });
     } catch (error: any) {
         res.status(400).json({ error: error.message });

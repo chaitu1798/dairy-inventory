@@ -110,7 +110,7 @@ const computeMonthlyRow = (start, end) => __awaiter(void 0, void 0, void 0, func
         total_purchases: totalPurchases,
         total_expenses: totalExpenses,
         total_waste: totalWaste,
-        profit: totalSales - totalPurchases - totalExpenses - totalWaste
+        profit: totalSales - totalPurchases - totalExpenses
     };
 });
 // Dashboard endpoint
@@ -156,7 +156,7 @@ router.get('/dashboard', auth_1.requireAuth, (req, res) => __awaiter(void 0, voi
                 total_purchases: totalPurchases,
                 total_expenses: totalExpenses,
                 total_waste: totalWaste,
-                net: totalSales - totalPurchases - totalExpenses - totalWaste
+                net: totalSales - totalPurchases - totalExpenses
             },
             total_stock_value: totalStockValue,
             low_stock_count: lowStockCount,
@@ -204,8 +204,8 @@ router.get('/daily', auth_1.requireAuth, (req, res) => __awaiter(void 0, void 0,
             total_purchases: totalPurchases,
             total_expenses: totalExpenses,
             total_waste: totalWaste,
-            profit: totalSales - totalPurchases - totalExpenses - totalWaste,
-            net: totalSales - totalPurchases - totalExpenses - totalWaste
+            profit: totalSales - totalPurchases - totalExpenses,
+            net: totalSales - totalPurchases - totalExpenses
         });
     }
     catch (error) {

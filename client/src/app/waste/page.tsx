@@ -207,8 +207,8 @@ export default function WastePage() {
                                 <TrendingDown className="w-5 h-5" />
                             </div>
                             <div className="flex-1">
-                                <p className="text-[10px] font-black text-rose-600/50 uppercase tracking-widest leading-none mb-1">Total Loss Value</p>
-                                <h4 className="text-lg font-black text-slate-900 leading-none">₹{summary.total_waste_value?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+                                <p className="text-[10px] font-black text-rose-600/50 uppercase tracking-widest truncate mb-1">Total Loss Value</p>
+                                <h4 className="text-lg font-black text-slate-900 truncate">₹{summary.total_waste_value?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
                             </div>
                         </Card>
                     )}
@@ -223,7 +223,7 @@ export default function WastePage() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{reason}</p>
-                                    <h5 className="text-lg font-black text-slate-900 leading-none">₹{Number(value).toLocaleString()}</h5>
+                                    <h5 className="text-lg font-black text-slate-900 truncate">₹{Number(value).toLocaleString()}</h5>
                                 </div>
                                 <Badge variant={getReasonVariant(reason)} className="h-6 px-2">
                                     {reason.charAt(0).toUpperCase()}
@@ -412,7 +412,7 @@ export default function WastePage() {
                                             <TableCell className="text-right">
                                                 <div className="flex flex-col items-end">
                                                     <span className="text-slate-900 font-extrabold">{record.quantity}</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase leading-none">{record.products?.unit}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase truncate">{record.products?.unit}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell>

@@ -24,14 +24,14 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/', requireAuth, validateRequest(CustomerSchema), async (req, res) => {
     try {
         const { name, phone, email, address, credit_limit } = req.body;
-        const newCustomer = {
+        const newCustomer: any = {
             name,
-            phone,
-            email,
-            address,
             credit_limit: parseFloat(credit_limit as any) || 0,
             created_at: new Date().toISOString()
         };
+        if (phone !== undefined) newCustomer.phone = phone;
+        if (email !== undefined) newCustomer.email = email;
+        if (address !== undefined) newCustomer.address = address;
 
         const docRef = await collections.customers.add(newCustomer);
         const doc = await docRef.get();

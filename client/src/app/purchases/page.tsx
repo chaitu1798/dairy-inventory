@@ -577,7 +577,7 @@ export default function PurchasesPage() {
                                             <TableCell className="text-right">
                                                 <div className="flex flex-col items-end">
                                                     <span className="text-slate-900 font-extrabold">{purchase.quantity}</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase leading-none">{purchase.products?.unit}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase truncate">{purchase.products?.unit}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right">

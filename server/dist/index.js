@@ -39,6 +39,7 @@ const uploadLimiter = (0, express_rate_limit_1.default)({
 // Configure CORS
 const allowedOrigins = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "http://localhost:3001",
     "http://localhost:5173",
     "https://dairy-inventory.vercel.app",

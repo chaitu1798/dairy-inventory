@@ -72,17 +72,17 @@ const StatCard = ({ title, value, icon: Icon, trend, suffix = '', description, g
                         </div>
                     )}
                 </div>
-                <div>
+                <div className="overflow-hidden">
                     <p className={cn(
-                        "text-sm font-semibold uppercase tracking-wider mb-1",
+                        "text-sm font-semibold uppercase tracking-wider mb-1 truncate",
                         gradient ? "text-white/80" : "text-slate-500"
                     )}>{title}</p>
-                    <h3 className="text-3xl font-extrabold tracking-tight">
+                    <h3 className="text-3xl font-extrabold tracking-tight truncate">
                         {suffix}{typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value || '0'}
                     </h3>
                     {description && (
                         <p className={cn(
-                            "text-xs mt-2 font-medium",
+                            "text-xs mt-2 font-medium truncate",
                             gradient ? "text-white/70" : "text-slate-400"
                         )}>{description}</p>
                     )}

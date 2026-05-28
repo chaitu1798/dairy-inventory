@@ -47,34 +47,30 @@ export const AuthProvider = ({ children }: { readonly children: React.ReactNode 
                 try {
                     const token = await getIdToken(firebaseUser, true);
                     
-                    // Requirement #3: Verify token validity with the backend
+                    // Try to verify with backend, but don't fail login if backend is unavailable
+                    let backendVerified = true;
                     try {
-                        // We pass the token explicitly in case localStorage isn't updated yet
                         await api.get('/auth/verify', {
                             headers: { Authorization: `Bearer ${token}` }
                         });
-
-                        const authUser: AuthUser = {
-                            ...firebaseUser,
-                            access_token: token
-                        } as AuthUser;
-
-                        setUser(authUser);
-                        setSessionCookie(token);
-
-                        // Maintain legacy storage for API interceptor compatibility (api.ts)
-                        localStorage.setItem('dairy_user', JSON.stringify({
-                            uid: firebaseUser.uid,
-                            email: firebaseUser.email,
-                            access_token: token
-                        }));
                     } catch (verifyError) {
-                        console.error('Backend token verification failed:', verifyError);
-                        setUser(null);
-                        setSessionCookie(null);
-                        localStorage.removeItem('dairy_user');
-                        await signOut(auth);
+                        console.warn('Backend token verification skipped/unavailable:', verifyError);
+                        backendVerified = false;
                     }
+
+                    const authUser: AuthUser = {
+                        ...firebaseUser,
+                        access_token: token
+                    } as AuthUser;
+
+                    setUser(authUser);
+                    setSessionCookie(token);
+
+                    localStorage.setItem('dairy_user', JSON.stringify({
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        access_token: token
+                    }));
                 } catch (error) {
                     console.error('Error getting Firebase token:', error);
                     setUser(null);

@@ -49,9 +49,9 @@ export default function WastePage() {
     const [loading, setLoading] = useState(true);
 
     const [isEditing, setIsEditing] = useState(false);
-    const [editId, setEditId] = useState<number | null>(null);
+    const [editId, setEditId] = useState<string | number | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [deleteId, setDeleteId] = useState<string | number | null>(null);
 
     const fetchProducts = useCallback(async () => {
         try {
@@ -107,7 +107,7 @@ export default function WastePage() {
 
     useEffect(() => {
         if (formData.product_id && formData.quantity) {
-            const product = products.find(p => p.id === Number.parseInt(formData.product_id, 10));
+            const product = products.find(p => String(p.id) === String(formData.product_id));
             if (product) {
                 const costValue = Number.parseFloat(formData.quantity) * Number.parseFloat(String(product.cost_price || 0));
                 setFormData(prev => ({ ...prev, cost_value: costValue.toFixed(2) }));
@@ -162,7 +162,7 @@ export default function WastePage() {
         });
     };
 
-    const handleDeleteClick = (id: number) => {
+    const handleDeleteClick = (id: string | number) => {
         setDeleteId(id);
         setIsDeleteDialogOpen(true);
     };

@@ -41,10 +41,10 @@ export default function CustomersPage() {
     const [searchQuery, setSearchQuery] = useState('');
 
     const [isEditing, setIsEditing] = useState(false);
-    const [editId, setEditId] = useState<number | null>(null);
+    const [editId, setEditId] = useState<string | number | null>(null);
 
     // Confirmation Dialog State
-    const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [deleteId, setDeleteId] = useState<string | number | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     const {
@@ -128,7 +128,7 @@ export default function CustomersPage() {
         });
     };
 
-    const handleDeleteClick = (id: number) => {
+    const handleDeleteClick = (id: string | number) => {
         setDeleteId(id);
         setIsDeleteDialogOpen(true);
     };

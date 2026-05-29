@@ -55,14 +55,14 @@ export default function ExpensesPage() {
     const ITEMS_PER_PAGE = 50;
 
     const [isEditing, setIsEditing] = useState(false);
-    const [editId, setEditId] = useState<number | null>(null);
+    const [editId, setEditId] = useState<string | number | null>(null);
     const [dateRange, setDateRange] = useState({
         startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0]
     });
 
     // Confirmation Dialog State
-    const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [deleteId, setDeleteId] = useState<string | number | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     const {
@@ -152,7 +152,7 @@ export default function ExpensesPage() {
         });
     };
 
-    const handleDeleteClick = (id: number) => {
+    const handleDeleteClick = (id: string | number) => {
         setDeleteId(id);
         setIsDeleteDialogOpen(true);
     };

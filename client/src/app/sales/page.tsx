@@ -74,7 +74,7 @@ export default function SalesPage() {
 
     // UI State
     const [isEditing, setIsEditing] = useState(false);
-    const [editId, setEditId] = useState<number | null>(null);
+    const [editId, setEditId] = useState<string | number | null>(null);
     const [saleType, setSaleType] = useState<SaleType>('counter');
     const [dateRange, setDateRange] = useState({
         startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
@@ -82,7 +82,7 @@ export default function SalesPage() {
     });
 
     // Confirmation Dialog State
-    const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [deleteId, setDeleteId] = useState<string | number | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     const {
@@ -244,7 +244,7 @@ export default function SalesPage() {
         });
     };
 
-    const handleDeleteClick = (id: number) => {
+    const handleDeleteClick = (id: string | number) => {
         setDeleteId(id);
         setIsDeleteDialogOpen(true);
     };

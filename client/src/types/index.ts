@@ -4,7 +4,7 @@ export interface Category {
 }
 
 export interface Product {
-    id: number;
+    id: string | number;
     name: string;
     categoryId: string;
     categoryName: string;
@@ -28,7 +28,7 @@ export interface Product {
 }
 
 export interface Customer {
-    id: number;
+    id: string | number;
     name: string;
     phone: string | null;
     email: string | null;
@@ -39,10 +39,10 @@ export interface Customer {
 }
 
 export interface Sale {
-    id: number;
+    id: string | number;
     invoice_number: string;
-    product_id: number;
-    customer_id: number | null;
+    product_id: string | number;
+    customer_id: string | number | null;
     quantity: number;
     price: number;
     total: number;
@@ -57,8 +57,8 @@ export interface Sale {
 }
 
 export interface Purchase {
-    id: number;
-    product_id: number;
+    id: string | number;
+    product_id: string | number;
     quantity: number;
     price: number;
     total: number;
@@ -69,7 +69,7 @@ export interface Purchase {
 }
 
 export interface Expense {
-    id: number;
+    id: string | number;
     category: string;
     amount: number;
     notes: string | null;
@@ -78,8 +78,8 @@ export interface Expense {
 }
 
 export interface Payment {
-    id: number;
-    sale_id: number;
+    id: string | number;
+    sale_id: string | number;
     amount: number;
     payment_date: string;
     payment_method: string | null;
@@ -88,15 +88,15 @@ export interface Payment {
 }
 
 export interface Waste {
-    id: number;
-    product_id: number;
+    id: string | number;
+    product_id: string | number;
     quantity: number;
     reason: 'expired' | 'damaged' | 'other';
     cost_value: number;
     waste_date: string;
     notes: string | null;
     created_at: string;
-    products?: { id: number; name: string; category: string; unit: string };
+    products?: { id: string | number; name: string; category: string; unit: string };
 }
 
 export interface DashboardStats {
@@ -111,8 +111,8 @@ export interface DashboardStats {
     low_stock_count: number;
     expiring_count: number;
     top_selling_products: Array<{
-        id?: number;
-        product_id: number;
+        id?: string | number;
+        product_id: string | number;
         name: string;
         category?: string;
         total_quantity_sold?: number;

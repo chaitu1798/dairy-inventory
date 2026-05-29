@@ -91,7 +91,7 @@ export default function ProductsPage() {
 
     // Editing State
     const [isEditing, setIsEditing] = useState(false);
-    const [editId, setEditId] = useState<number | null>(null);
+    const [editId, setEditId] = useState<string | number | null>(null);
 
     // Stock Update State
     const [isStockModalOpen, setIsStockModalOpen] = useState(false);
@@ -104,7 +104,7 @@ export default function ProductsPage() {
     const [stream, setStream] = useState<MediaStream | null>(null);
 
     // Delete Confirmation State
-    const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [deleteId, setDeleteId] = useState<string | number | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     // Form Hooks
@@ -226,7 +226,7 @@ export default function ProductsPage() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleDeleteClick = (id: number) => {
+    const handleDeleteClick = (id: string | number) => {
         setDeleteId(id);
         setIsDeleteDialogOpen(true);
     };

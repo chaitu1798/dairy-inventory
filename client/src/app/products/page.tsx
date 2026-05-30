@@ -82,6 +82,7 @@ export default function ProductsPage() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
+    const [bulkUploading, setBulkUploading] = useState(false);
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -243,6 +244,33 @@ export default function ProductsPage() {
         } finally {
             setIsDeleteDialogOpen(false);
             setDeleteId(null);
+        }
+    };
+
+    const handleBulkImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        
+        setBulkUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            const response = await api.post('/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            if (response.data.productCreation) {
+                toast.success(response.data.productCreation.message);
+                fetchProducts(currentPage);
+            }
+        } catch (error: unknown) {
+            console.error('Error importing products:', error);
+            toast.error('Failed to import products');
+        } finally {
+            setBulkUploading(false);
+            // Reset input
+            event.target.value = '';
         }
     };
 
@@ -529,6 +557,19 @@ export default function ProductsPage() {
                             />
                         </div>
                         <div className="flex items-center gap-3 w-full md:w-auto">
+                            <label className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-xl border border-primary/20 cursor-pointer hover:bg-primary/20 transition-colors">
+                                <Camera className="w-4 h-4" />
+                                <span className="text-sm font-bold">
+                                    {bulkUploading ? 'Importing...' : 'Import from Photo'}
+                                </span>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleBulkImport}
+                                    disabled={bulkUploading}
+                                    className="hidden"
+                                />
+                            </label>
                             <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100/50">
                                 <Filter className="w-3.5 h-3.5 text-slate-400" />
                                 <span className="text-xs font-black uppercase tracking-widest text-slate-400">Sort By</span>

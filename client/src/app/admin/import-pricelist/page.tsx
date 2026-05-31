@@ -5,7 +5,7 @@ import api from '../../../utils/api';
 import { Button } from '../../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/Card';
 import { toast } from 'sonner';
-import { Loader2, Upload, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Loader2, Upload, AlertTriangle, CheckCircle2, ShoppingCart } from 'lucide-react';
 import ConfirmationDialog from '../../../components/ui/ConfirmationDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/Table';
 import { useCategories } from '../../../context/CategoryContext';
@@ -13,11 +13,13 @@ import { useCategories } from '../../../context/CategoryContext';
 export default function AdminImportPage() {
     const { refreshCategories } = useCategories();
     const [isImporting, setIsImporting] = useState(false);
+    const [isPurchasesImporting, setIsPurchasesImporting] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [previewData, setPreviewData] = useState<any[]>([]);
     const [totalCategories, setTotalCategories] = useState(0);
     const [totalProducts, setTotalProducts] = useState(0);
     const [importResult, setImportResult] = useState<any>(null);
+    const [purchasesImportResult, setPurchasesImportResult] = useState<any>(null);
     const [backupData, setBackupData] = useState<any>(null);
 
     const handlePreview = async () => {
@@ -83,6 +85,22 @@ export default function AdminImportPage() {
         }
     };
 
+    const handleImportPurchases = async () => {
+        setIsPurchasesImporting(true);
+        try {
+            const importRes = await api.post('/admin/import-purchases');
+            if (importRes.data.success) {
+                setPurchasesImportResult(importRes.data);
+                toast.success('Purchases imported successfully!');
+            }
+        } catch (error) {
+            console.error('Import purchases failed:', error);
+            toast.error('Failed to import purchases');
+        } finally {
+            setIsPurchasesImporting(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 p-8">
             <div className="max-w-7xl mx-auto space-y-8">
@@ -91,20 +109,37 @@ export default function AdminImportPage() {
                         <h1 className="text-3xl font-bold text-gray-900">Admin: Import Price List</h1>
                         <p className="text-gray-500 mt-2">Replace existing inventory with new price list data</p>
                     </div>
-                    <div className="flex gap-4">
-                        <Button 
-                            onClick={handleBackup}
-                            variant="outline"
-                        >
-                            Create Backup
-                        </Button>
-                        <Button 
-                            onClick={handlePreview}
-                            disabled={isImporting}
-                        >
-                            Load Preview
-                        </Button>
-                    </div>
+                    <div className="flex gap-4 flex-wrap">
+                    <Button 
+                        onClick={handleBackup}
+                        variant="outline"
+                    >
+                        Create Backup
+                    </Button>
+                    <Button 
+                        onClick={handlePreview}
+                        disabled={isImporting}
+                    >
+                        Load Preview
+                    </Button>
+                    <Button 
+                        onClick={handleImportPurchases}
+                        disabled={isPurchasesImporting}
+                        variant="gradient"
+                    >
+                        {isPurchasesImporting ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Importing...
+                            </>
+                        ) : (
+                            <>
+                                <ShoppingCart className="w-4 h-4 mr-2" />
+                                Import Purchases (30-05-2026)
+                            </>
+                        )}
+                    </Button>
+                </div>
                 </div>
 
                 {/* Import Result */}
@@ -112,7 +147,7 @@ export default function AdminImportPage() {
                     <Card className="border-green-200 bg-green-50">
                         <CardHeader>
                             <CardTitle className="text-green-800 flex items-center gap-2">
-                                <CheckCircle2 className="h-6 w-6" />
+                                <CheckCircle2 className="w-6 h-6" />
                                 Import Completed Successfully
                             </CardTitle>
                         </CardHeader>
@@ -122,6 +157,21 @@ export default function AdminImportPage() {
                             <p><strong>Threshold Applied:</strong> {importResult.thresholdApplied}</p>
                             <p><strong>Cost Price Updated:</strong> {importResult.costPriceUpdated}</p>
                             <p><strong>Old Data Removed:</strong> {importResult.oldDataRemoved ? 'Yes' : 'No'}</p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Purchases Import Result */}
+                {purchasesImportResult && (
+                    <Card className="border-blue-200 bg-blue-50">
+                        <CardHeader>
+                            <CardTitle className="text-blue-800 flex items-center gap-2">
+                                <CheckCircle2 className="w-6 h-6" />
+                                Purchases Import Completed Successfully
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-blue-800">
+                            <p><strong>Purchases Imported:</strong> {purchasesImportResult.importedCount} of {purchasesImportResult.totalItems}</p>
                         </CardContent>
                     </Card>
                 )}

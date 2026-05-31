@@ -3,6 +3,74 @@ import { collections, db } from '../firebase';
 import { requireAuth } from '../middleware/auth';
 import multer from 'multer';
 
+const purchaseData = [
+  { name: 'ganga500', quantity: 192 },
+  { name: 'ganga200', quantity: 136 },
+  { name: 'dtm200', quantity: 63 },
+  { name: 'cooling', quantity: 0 },
+  { name: 'colli', quantity: 12 },
+  { name: 'butter milk', quantity: 660 },
+  { name: 'curd 80', quantity: 0 },
+  { name: 'curd 180', quantity: 90 },
+  { name: 'curd 425', quantity: 312 },
+  { name: 'curd liter', quantity: 101 },
+  { name: 'curd dtm', quantity: 519 },
+  { name: '100 cups', quantity: 41 },
+  { name: '170 cups', quantity: 0 },
+  { name: '400 cup', quantity: 1 },
+  { name: '1 litre tub', quantity: 6 },
+  { name: '20 liter tub', quantity: 0 },
+  { name: '10 liter tub', quantity: 0 },
+  { name: '5 liter tub', quantity: 0 },
+  { name: 'paneer', quantity: 5 },
+  { name: 'paneer 500', quantity: 2 },
+  { name: 'paneer 200', quantity: 4 },
+  { name: 'cow gee kg', quantity: 2 },
+  { name: 'cowgee 500', quantity: 1 },
+  { name: 'cow gee200', quantity: 6 },
+  { name: 'gee 500', quantity: 0 },
+  { name: 'lassi', quantity: 0 },
+  { name: 'mango lassi', quantity: 0 },
+  { name: 'lassi', quantity: 164 },
+  { name: 'junnu', quantity: 16 },
+  { name: 'misthidoi', quantity: 0 },
+  { name: 'buns', quantity: 30 },
+  { name: '400 bred', quantity: 1 },
+  { name: '200 bred', quantity: 11 },
+  { name: 'cup cake', quantity: 3 },
+  { name: 'palem cake', quantity: 0 },
+  { name: 'rusk', quantity: 2 },
+  { name: 'osmaniya 20', quantity: 1 },
+  { name: 'osmaniya 40', quantity: 2 },
+  { name: 'osmaniya 60', quantity: 0 },
+  { name: 'osmaniya 120', quantity: 1 },
+  { name: 'dood ped20', quantity: 50 },
+  { name: 'bodam barfi', quantity: 0 },
+  { name: 'dood peda 250', quantity: 2 },
+  { name: 'khalakand', quantity: 0 },
+  { name: 'milkcace 500', quantity: 0 },
+  { name: 'mysorepak', quantity: 0 },
+  { name: 'nuvvulu 200', quantity: 0 },
+  { name: 'bodam milk', quantity: 165 },
+  { name: 'lemon', quantity: 40 },
+  { name: 'manga', quantity: 78 },
+  { name: 'zero', quantity: 74 },
+  { name: 'milk shake', quantity: 114 },
+  { name: 'spaicy chogodi', quantity: 0 },
+  { name: 'spaicy chogodi', quantity: 4 },
+  { name: 'ribbon pakodi', quantity: 0 },
+  { name: 'ribbon pakodi', quantity: 1 },
+  { name: 'jonna murukulu', quantity: 1 },
+  { name: 'jonna murukulu', quantity: 0 },
+  { name: 'kaju mixer 400', quantity: 0 },
+  { name: 'kaju mixer200', quantity: 6 },
+  { name: 'moong dal 400', quantity: 2 },
+  { name: 'moong dal 200', quantity: 5 },
+  { name: 'cron flakes', quantity: 3 },
+  { name: 'ganga 500 box', quantity: 0 },
+  { name: 'slim', quantity: 0 },
+];
+
 const router = Router();
 
 const upload = multer({
@@ -223,6 +291,55 @@ router.get('/preview', requireAuth, async (req, res) => {
         totalCategories: uniqueCategories.length,
         totalProducts: priceListData.length
     });
+});
+
+router.post('/import-purchases', requireAuth, async (req, res) => {
+    try {
+        const batch = db.batch();
+        const purchaseDate = '2026-05-30';
+        let importedCount = 0;
+
+        const productsSnapshot = await collections.products.get();
+        const products = productsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data() as any
+        }));
+
+        for (const item of purchaseData) {
+            if (item.quantity <= 0) continue;
+
+            const product = products.find(p => 
+                p.name.toLowerCase() === item.name.toLowerCase() ||
+                p.productName?.toLowerCase() === item.name.toLowerCase()
+            );
+
+            if (product) {
+                const purchaseRef = collections.purchases.doc();
+                batch.set(purchaseRef, {
+                    product_id: product.id,
+                    quantity: item.quantity,
+                    price: product.cost_price || product.costPrice || 0,
+                    total: item.quantity * (product.cost_price || product.costPrice || 0),
+                    purchase_date: purchaseDate,
+                    expiry_date: null,
+                    created_at: new Date().toISOString()
+                });
+                importedCount++;
+            }
+        }
+
+        await batch.commit();
+
+        res.json({
+            success: true,
+            message: 'Purchases imported successfully',
+            importedCount,
+            totalItems: purchaseData.length
+        });
+    } catch (error) {
+        console.error('Import purchases failed:', error);
+        res.status(500).json({ success: false, error: 'Failed to import purchases' });
+    }
 });
 
 export default router;

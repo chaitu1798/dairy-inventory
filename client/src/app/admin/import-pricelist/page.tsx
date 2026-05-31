@@ -97,17 +97,17 @@ export default function AdminImportPage() {
                 formData.append('image', purchasePhoto);
             }
 
-            const importRes = await api.post('/admin/import-purchases', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            // Don't set Content-Type header manually, let axios set it with boundary!
+            const importRes = await api.post('/admin/import-purchases', formData);
             
             if (importRes.data.success) {
                 setPurchasesImportResult(importRes.data);
                 toast.success('Purchases imported successfully!');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Import purchases failed:', error);
-            toast.error('Failed to import purchases');
+            const errorMsg = error.response?.data?.error || 'Failed to import purchases';
+            toast.error(errorMsg);
         } finally {
             setIsPurchasesImporting(false);
         }

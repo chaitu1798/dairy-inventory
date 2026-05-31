@@ -3,6 +3,7 @@
 import './globals.css';
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { CategoryProvider } from '../context/CategoryContext';
 import Sidebar from '../components/Sidebar';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -135,13 +136,15 @@ export default function RootLayout({
       <body className="min-h-screen bg-background font-sans antialiased text-foreground selection:bg-primary/10 selection:text-primary">
         <a href="#main-content" className="skip-to-content focus:z-50">Skip to main content</a>
         <AuthProvider>
-          <AuthenticatedLayout>{children}</AuthenticatedLayout>
-          <Toaster position="top-right" richColors closeButton toastOptions={{
-            style: {
-              borderRadius: 'var(--radius)',
-              boxShadow: 'var(--shadow-lg)',
-            }
-          }} />
+          <CategoryProvider>
+            <AuthenticatedLayout>{children}</AuthenticatedLayout>
+            <Toaster position="top-right" richColors closeButton toastOptions={{
+              style: {
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-lg)',
+              }
+            }} />
+          </CategoryProvider>
         </AuthProvider>
         <Analytics />
       </body>

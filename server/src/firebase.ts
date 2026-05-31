@@ -65,5 +65,7 @@ export const collections = {
     waste: db.collection('waste'),
     stock_logs: db.collection('stock_logs'),
     payments: db.collection('payments'),
+    categories: db.collection('categories'),
+    inventory: db.collection('inventory'),
 };
 

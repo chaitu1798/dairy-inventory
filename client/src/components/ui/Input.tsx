@@ -34,7 +34,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                             "flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm transition-all duration-200",
                             "placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary",
                             "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-50",
-                            startAdornment && "pl-11",
+                            startAdornment && "pl-14",
                             error && "border-destructive focus:ring-destructive/5 focus:border-destructive",
                             className
                         )}

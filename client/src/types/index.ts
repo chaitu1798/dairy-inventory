@@ -1,30 +1,35 @@
 export interface Category {
     id: string;
     name: string;
+    isActive: boolean;
+    createdAt: string;
 }
 
 export interface Product {
     id: string | number;
-    name: string;
-    categoryId: string;
-    categoryName: string;
-    category?: string; // Legacy
-    type?: string;     // Legacy
-    unit: string;
-    price: number;
+    productName: string;
+    category: string;
+    costPrice: number;
+    counterPrice: number;
+    distributionPrice: number;
+    stock: number;
+    thresholdLimit: number;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+
+    // Legacy fields for compatibility
+    name?: string;
+    categoryId?: string;
+    categoryName?: string;
+    unit?: string;
+    price?: number;
     distribution_price?: number;
     cost_price?: number;
     min_stock?: number;
     low_stock_threshold?: number;
-    track_expiry?: boolean;
-    expiry_date?: string | null;
-    expiry_days?: number;
-    created_at?: string;
-    current_stock?: number;
     stock_quantity?: number;
-    stock_value?: number;
     is_low_stock?: boolean;
-    days_until_expiry?: number;
 }
 
 export interface Customer {

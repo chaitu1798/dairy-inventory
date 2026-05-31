@@ -42,16 +42,16 @@ import ConfirmationDialog from '../../components/ui/ConfirmationDialog';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 
-import { CATEGORIES, getCategoryName } from '../../constants/categories';
+import { useCategories } from '../../context/CategoryContext';
 
 const productSchema = z.object({
     name: z.string().min(1, 'Product name is required'),
     categoryId: z.string().min(1, 'Category is required'),
     categoryName: z.string().min(1, 'Category name is required'),
     unit: z.string().min(1, 'Unit is required'),
-    price: z.coerce.number().min(0.01, 'Selling price must be greater than 0'),
-    distribution_price: z.coerce.number().min(0.01, 'Distribution price must be greater than 0').optional().or(z.literal('')),
-    cost_price: z.coerce.number().min(0.01, 'Cost price must be greater than 0'),
+    price: z.coerce.number().min(0, 'Selling price must be at least 0'),
+    distribution_price: z.coerce.number().min(0, 'Distribution price must be at least 0').optional().or(z.literal('')),
+    cost_price: z.coerce.number().min(0, 'Cost price must be at least 0'),
     expiry_date: z.string().optional(),
     track_expiry: z.boolean().optional(),
     low_stock_threshold: z.number().optional()
@@ -76,6 +76,7 @@ const stockUpdateSchema = z.object({
 type StockUpdateFormData = z.infer<typeof stockUpdateSchema>;
 
 export default function ProductsPage() {
+    const { categories } = useCategories();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -440,10 +441,10 @@ export default function ProductsPage() {
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             setValue('categoryId', val);
-                                            setValue('categoryName', getCategoryName(val));
+                                            setValue('categoryName', categories.find(c => c.id === val)?.name || '');
                                         }}
                                         error={errors.categoryId}
-                                        options={CATEGORIES.map(c => ({ value: c.id, label: c.name }))}
+                                        options={categories.map(c => ({ value: c.id, label: c.name }))}
                                         className="bg-white"
                                     />
                                 </div>
@@ -579,7 +580,7 @@ export default function ProductsPage() {
                                     className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
                                 >
                                     <option value="all">Every Category</option>
-                                    {CATEGORIES.map(c => (
+                                    {categories.map(c => (
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                     ))}
                                 </select>

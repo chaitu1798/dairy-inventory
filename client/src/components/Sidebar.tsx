@@ -13,7 +13,8 @@ import {
     Trash2, 
     Users, 
     ChevronRight,
-    UserCircle
+    UserCircle,
+    Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
@@ -52,6 +53,12 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 { href: '/waste', label: 'Waste', icon: Trash2 },
                 { href: '/reports/daily', label: 'Daily Report', icon: FileBarChart },
                 { href: '/reports/monthly', label: 'Monthly Report', icon: FileBarChart },
+            ]
+        },
+        {
+            title: "Admin",
+            links: [
+                { href: '/admin/import-pricelist', label: 'Import Price List', icon: Settings },
             ]
         }
     ];

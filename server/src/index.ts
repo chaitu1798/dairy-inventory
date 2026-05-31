@@ -12,6 +12,8 @@ import customersRoutes from './routes/customers';
 import financeRoutes from './routes/finance';
 import stockRoutes from './routes/stock';
 import uploadRouter from './routes/upload';
+import adminRouter from './routes/admin';
+import categoriesRouter from './routes/categories';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -86,6 +88,8 @@ app.use('/customers', customersRoutes);
 app.use('/finance', financeRoutes);
 app.use('/stock', stockRoutes);
 app.use('/upload', uploadLimiter, uploadRouter);
+app.use('/admin', adminRouter);
+app.use('/categories', categoriesRouter);
 
 // Health check
 app.get('/health', (req, res) => {

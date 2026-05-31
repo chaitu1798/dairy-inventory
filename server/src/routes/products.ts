@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { collections } from '../firebase';
+import { collections, db } from '../firebase';
 import { requireAuth } from '../middleware/auth';
 import { validateRequest } from '../middleware/validateRequest';
 import { ProductSchema } from '../schemas';
@@ -16,76 +16,90 @@ router.get('/', requireAuth, async (req, res) => {
         // Build query — remove orderBy from Firestore to avoid composite index requirement
         let query: FirebaseFirestore.Query = collections.products;
 
-        // Server-side search: Firestore range query on 'name'
-        if (search) {
-            query = query
-                .where('name', '>=', search)
-                .where('name', '<=', search + '\uf8ff');
-            // If we have search, Firestore forced us to sort by 'name' anyway or it fails.
-            // But search is usually specific enough.
-        }
-
-        // Server-side category filter
-        if (categoryId && categoryId !== 'all') {
-            query = query.where('categoryId', '==', categoryId);
-        }
-
         // Execute query without strict limit to allow memory sorting
         // We use a high limit (5000) as a safety measure for small-medium inventories
         const snapshot = await query.limit(5000).get();
 
-        // If no results with categoryId, try legacy category field for older data
-        let docs = snapshot.docs;
-        if (docs.length === 0 && categoryId && categoryId !== 'all' && !search) {
-            const legacySnapshot = await collections.products
-                .where('category', '==', categoryId)
-                .limit(5000)
-                .get();
-            docs = legacySnapshot.docs;
-        }
-
-        let allDocs = docs.map(doc => {
+        let allDocs = snapshot.docs.map(doc => {
             const data = doc.data() as any;
-            const normalizedData = {
+            
+            // Normalize for both new and legacy structures
+            const productName = data.productName || data.name || '';
+            const categoryName = data.category || data.categoryName || 'General Product';
+            const counterPrice = data.counterPrice || data.price || 0;
+            const distributionPrice = data.distributionPrice || data.distribution_price || 0;
+            const costPrice = data.costPrice || data.cost_price || counterPrice;
+            const stock = data.stock || data.stock_quantity || 0;
+            const thresholdLimit = data.thresholdLimit || data.min_stock || data.low_stock_threshold || 5;
+            const isLowStock = stock <= thresholdLimit;
+
+            return {
                 id: doc.id,
                 ...data,
-                name: data.name || '',
+                // New fields
+                productName,
+                category: categoryName,
+                costPrice,
+                counterPrice,
+                distributionPrice,
+                stock,
+                thresholdLimit,
+                isActive: data.isActive !== false,
+                is_low_stock: isLowStock,
+                // Legacy fields for compatibility
+                name: productName,
                 categoryId: data.categoryId || data.category || 'products',
-                categoryName: data.categoryName || (data.category ? data.category.charAt(0).toUpperCase() + data.category.slice(1) : 'General Product'),
-                type: data.categoryId || data.category || 'products',
-                low_stock_threshold: data.min_stock || 10
+                categoryName: categoryName,
+                unit: data.unit || 'packets',
+                price: counterPrice,
+                distribution_price: distributionPrice,
+                cost_price: costPrice,
+                min_stock: thresholdLimit,
+                low_stock_threshold: thresholdLimit,
+                stock_quantity: stock,
             };
-            return normalizedData;
         });
 
+        // Apply category filter in memory (since categories are stored as names now)
+        if (categoryId && categoryId !== 'all') {
+            const categoryMap: Record<string, string> = {
+                'milk-products': 'Milk Products',
+                'lassi-items': 'Lassi Items',
+                'curd-paneer': 'Curd & Paneer',
+                'ghee': 'Ghee',
+                'breads-cakes-biscuits': 'Breads Cakes & Biscuits',
+                'sweets': 'Sweets',
+                'savory-snacks-others': 'Savory Snacks & Others',
+            };
+            const targetCategory = categoryMap[categoryId] || categoryId;
+            allDocs = allDocs.filter(doc => 
+                doc.category === targetCategory || 
+                doc.categoryName === targetCategory ||
+                doc.categoryId === categoryId
+            );
+        }
+
+        // Apply search filter in memory
+        if (search) {
+            const searchLower = search.toLowerCase();
+            allDocs = allDocs.filter(doc => 
+                doc.productName.toLowerCase().includes(searchLower) || 
+                doc.name.toLowerCase().includes(searchLower)
+            );
+        }
+
         // Perform in-memory sorting
-        allDocs.sort((a, b) => (String(a.name) || '').localeCompare(String(b.name) || ''));
+        allDocs.sort((a, b) => (String(a.productName) || '').localeCompare(String(b.productName) || ''));
 
         // Client-side pagination matching the API request
         const start = (page - 1) * limit;
         const data = allDocs.slice(start, start + limit);
 
-        // Count for total results found
-        let totalCount = allDocs.length;
-        
-        // Defensive count: use aggregation if available, otherwise use fetched list size
-        if (!categoryId || categoryId === 'all') {
-            if (!search) {
-                try {
-                    const countSnapshot = await collections.products.count().get();
-                    totalCount = countSnapshot.data().count;
-                } catch (e) {
-                    console.warn('Firestore count() failed, falling back to document length:', e);
-                    // totalCount already set to allDocs.length
-                }
-            }
-        }
-
         res.json({
             data,
-            count: totalCount,
+            count: allDocs.length,
             page,
-            totalPages: Math.ceil(totalCount / limit)
+            totalPages: Math.ceil(allDocs.length / limit)
         });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -105,22 +119,39 @@ router.post('/', requireAuth, validateRequest(ProductSchema), async (req, res) =
             low_stock_threshold, 
             reorder_level,
             track_expiry, 
-            expiry_date 
+            expiry_date,
+            productName,
+            category,
+            costPrice,
+            counterPrice,
+            distributionPrice,
+            thresholdLimit,
+            isActive
         } = req.body;
 
         const newProduct = {
-            name,
-            categoryId,
-            categoryName,
-            category: categoryId, // Keep for backward compatibility
-            unit: unit || 'unit',
-            price: parseFloat(price as any) || 0,
-            distribution_price: parseFloat(distribution_price as any) || 0,
-            cost_price: parseFloat(cost_price as any) || 0,
-            min_stock: parseInt((low_stock_threshold || reorder_level) as any) || 10,
+            productName: productName || name || '',
+            category: category || categoryName || 'General Product',
+            costPrice: costPrice || counterPrice || price || 0,
+            counterPrice: counterPrice || price || 0,
+            distributionPrice: distributionPrice || distribution_price || 0,
+            stock: 0,
+            thresholdLimit: thresholdLimit || low_stock_threshold || reorder_level || 5,
+            isActive: isActive !== false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            // Legacy fields for compatibility
+            name: productName || name || '',
+            categoryId: categoryId || category || 'products',
+            categoryName: category || categoryName || 'General Product',
+            category: category || categoryId,
+            unit: unit || 'packets',
+            price: counterPrice || price || 0,
+            distribution_price: distributionPrice || distribution_price || 0,
+            cost_price: costPrice || cost_price || counterPrice || 0,
+            min_stock: thresholdLimit || low_stock_threshold || 5,
             track_expiry: !!track_expiry,
             expiry_date: expiry_date || null,
-            created_at: new Date().toISOString()
         };
 
         const docRef = await collections.products.add(newProduct);
@@ -146,25 +177,56 @@ router.put('/:id', requireAuth, validateRequest(ProductSchema), async (req, res)
             low_stock_threshold, 
             reorder_level,
             track_expiry, 
-            expiry_date 
+            expiry_date,
+            productName,
+            category,
+            costPrice,
+            counterPrice,
+            distributionPrice,
+            thresholdLimit,
+            isActive
         } = req.body;
 
         const updates: any = {};
-        if (name !== undefined) updates.name = name;
-        if (categoryId !== undefined) {
-            updates.categoryId = categoryId;
-            updates.category = categoryId; // Backwards compatibility
+        if (name !== undefined || productName !== undefined) {
+            updates.productName = productName || name;
+            updates.name = productName || name;
         }
-        if (categoryName !== undefined) updates.categoryName = categoryName;
-        if (unit !== undefined) updates.unit = unit;
-        if (price !== undefined) updates.price = parseFloat(price as any);
-        if (distribution_price !== undefined) updates.distribution_price = parseFloat(distribution_price as any);
-        if (cost_price !== undefined) updates.cost_price = parseFloat(cost_price as any);
-        if (low_stock_threshold !== undefined || reorder_level !== undefined) {
-            updates.min_stock = parseInt((low_stock_threshold || reorder_level) as any);
+        if (category !== undefined || categoryName !== undefined || categoryId !== undefined) {
+            updates.category = category || categoryName || categoryId;
+            updates.categoryName = category || categoryName;
+            updates.categoryId = categoryId || category;
         }
-        if (track_expiry !== undefined) updates.track_expiry = track_expiry;
-        if (expiry_date !== undefined) updates.expiry_date = expiry_date || null;
+        if (costPrice !== undefined || cost_price !== undefined) {
+            updates.costPrice = costPrice || cost_price;
+            updates.cost_price = costPrice || cost_price;
+        }
+        if (counterPrice !== undefined || price !== undefined) {
+            updates.counterPrice = counterPrice || price;
+            updates.price = counterPrice || price;
+        }
+        if (distributionPrice !== undefined || distribution_price !== undefined) {
+            updates.distributionPrice = distributionPrice || distribution_price;
+            updates.distribution_price = distributionPrice || distribution_price;
+        }
+        if (thresholdLimit !== undefined || low_stock_threshold !== undefined || reorder_level !== undefined) {
+            updates.thresholdLimit = thresholdLimit || low_stock_threshold || reorder_level;
+            updates.min_stock = thresholdLimit || low_stock_threshold || reorder_level;
+            updates.low_stock_threshold = thresholdLimit || low_stock_threshold || reorder_level;
+        }
+        if (isActive !== undefined) {
+            updates.isActive = isActive;
+        }
+        if (unit !== undefined) {
+            updates.unit = unit;
+        }
+        if (track_expiry !== undefined) {
+            updates.track_expiry = track_expiry;
+        }
+        if (expiry_date !== undefined) {
+            updates.expiry_date = expiry_date;
+        }
+        updates.updatedAt = new Date().toISOString();
 
         await collections.products.doc(id).update(updates);
         const doc = await collections.products.doc(id).get();

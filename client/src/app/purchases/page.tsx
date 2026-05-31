@@ -37,7 +37,7 @@ import {
 import { cn } from '../../lib/utils';
 import Modal from '../../components/ui/Modal';
 import { useFilteredProducts } from '../../hooks/useFilteredProducts';
-import { CATEGORIES } from '../../constants/categories';
+import { useCategories } from '../../context/CategoryContext';
 
 const purchaseSchema = z.object({
     categoryId: z.string().min(1, 'Category is required'),
@@ -51,6 +51,7 @@ const purchaseSchema = z.object({
 type PurchaseFormData = z.infer<typeof purchaseSchema>;
 
 export default function PurchasesPage() {
+    const { categories } = useCategories();
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const { products: filteredProducts, loading: productsLoading } = useFilteredProducts(selectedCategoryId);
     const [allProducts, setAllProducts] = useState<Product[]>([]); // For existing list display
@@ -387,7 +388,7 @@ export default function PurchasesPage() {
                                         setValue('product_id', ''); // Reset product
                                     }}
                                     error={errors.categoryId}
-                                    options={CATEGORIES.map(c => ({ value: c.id, label: c.name }))}
+                                    options={categories.map(c => ({ value: c.id, label: c.name }))}
                                     placeholder="Choose category first"
                                     className="bg-white"
                                 />

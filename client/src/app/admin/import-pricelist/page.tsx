@@ -5,7 +5,7 @@ import api from '../../../utils/api';
 import { Button } from '../../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/Card';
 import { toast } from 'sonner';
-import { Loader2, Upload, AlertTriangle, CheckCircle2, ShoppingCart } from 'lucide-react';
+import { Loader2, Upload, AlertTriangle, CheckCircle2, ShoppingCart, Camera } from 'lucide-react';
 import ConfirmationDialog from '../../../components/ui/ConfirmationDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/Table';
 import { useCategories } from '../../../context/CategoryContext';
@@ -85,10 +85,22 @@ export default function AdminImportPage() {
         }
     };
 
+    const [purchaseDate, setPurchaseDate] = useState('2026-05-30');
+    const [purchasePhoto, setPurchasePhoto] = useState<File | null>(null);
+    
     const handleImportPurchases = async () => {
         setIsPurchasesImporting(true);
         try {
-            const importRes = await api.post('/admin/import-purchases');
+            const formData = new FormData();
+            formData.append('purchaseDate', purchaseDate);
+            if (purchasePhoto) {
+                formData.append('image', purchasePhoto);
+            }
+
+            const importRes = await api.post('/admin/import-purchases', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
             if (importRes.data.success) {
                 setPurchasesImportResult(importRes.data);
                 toast.success('Purchases imported successfully!');
@@ -122,23 +134,62 @@ export default function AdminImportPage() {
                     >
                         Load Preview
                     </Button>
-                    <Button 
-                        onClick={handleImportPurchases}
-                        disabled={isPurchasesImporting}
-                        variant="gradient"
-                    >
-                        {isPurchasesImporting ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                Importing...
-                            </>
-                        ) : (
-                            <>
-                                <ShoppingCart className="w-4 h-4 mr-2" />
-                                Import Purchases (30-05-2026)
-                            </>
-                        )}
-                    </Button>
+                    <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 className="text-lg font-bold text-slate-800">Import Purchases</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-slate-700">Purchase Date</label>
+                                <input 
+                                    type="date"
+                                    value={purchaseDate}
+                                    onChange={(e) => setPurchaseDate(e.target.value)}
+                                    className="w-full p-3 rounded-xl border border-slate-300"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-slate-700">Upload Photo (Optional)</label>
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                        <Camera className="w-4 h-4" />
+                                        <span className="text-sm font-semibold">
+                                            {purchasePhoto ? purchasePhoto.name : 'Choose File'}
+                                        </span>
+                                        <input 
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => setPurchasePhoto(e.target.files?.[0] || null)}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                    {purchasePhoto && (
+                                        <button 
+                                            onClick={() => setPurchasePhoto(null)}
+                                            className="text-slate-500 hover:text-red-500"
+                                        >
+                                            X
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <Button 
+                            onClick={handleImportPurchases}
+                            disabled={isPurchasesImporting}
+                            variant="gradient"
+                        >
+                            {isPurchasesImporting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                    Importing...
+                                </>
+                            ) : (
+                                <>
+                                    <ShoppingCart className="w-4 h-4 mr-2" />
+                                    Import Purchases
+                                </>
+                            )}
+                        </Button>
+                    </div>
                 </div>
                 </div>
 

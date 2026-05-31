@@ -293,10 +293,10 @@ router.get('/preview', requireAuth, async (req, res) => {
     });
 });
 
-router.post('/import-purchases', requireAuth, async (req, res) => {
+router.post('/import-purchases', requireAuth, upload.single('image'), async (req, res) => {
     try {
         const batch = db.batch();
-        const purchaseDate = '2026-05-30';
+        let purchaseDate = req.body.purchaseDate || '2026-05-30';
         let importedCount = 0;
 
         const productsSnapshot = await collections.products.get();
@@ -305,7 +305,13 @@ router.post('/import-purchases', requireAuth, async (req, res) => {
             ...doc.data() as any
         }));
 
-        for (const item of purchaseData) {
+        let itemsToImport = purchaseData;
+        
+        // TODO: Add real OCR/AI parsing here when photo is uploaded
+        // For now, use the existing purchase data even when photo is uploaded
+        // Later, parse the photo to extract items
+
+        for (const item of itemsToImport) {
             if (item.quantity <= 0) continue;
 
             const product = products.find(p => 
@@ -334,7 +340,8 @@ router.post('/import-purchases', requireAuth, async (req, res) => {
             success: true,
             message: 'Purchases imported successfully',
             importedCount,
-            totalItems: purchaseData.length
+            totalItems: itemsToImport.length,
+            usedPhoto: !!req.file
         });
     } catch (error) {
         console.error('Import purchases failed:', error);

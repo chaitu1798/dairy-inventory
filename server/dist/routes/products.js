@@ -15,6 +15,21 @@ const auth_1 = require("../middleware/auth");
 const validateRequest_1 = require("../middleware/validateRequest");
 const schemas_1 = require("../schemas");
 const router = (0, express_1.Router)();
+const KNOWN_CATEGORY_NAMES = {
+    'milk-products': 'Milk Products',
+    'lassi-items': 'Lassi Items',
+    'curd-paneer': 'Curd & Paneer',
+    'ghee': 'Ghee',
+    'breads-cakes-biscuits': 'Breads Cakes & Biscuits',
+    'sweets': 'Sweets',
+    'savory-snacks-others': 'Savory Snacks & Others',
+};
+const normalizeCategoryValue = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 router.get('/', auth_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -23,60 +38,74 @@ router.get('/', auth_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void
         const categoryId = req.query.categoryId || '';
         // Build query — remove orderBy from Firestore to avoid composite index requirement
         let query = firebase_1.collections.products;
-        // Server-side search: Firestore range query on 'name'
-        if (search) {
-            query = query
-                .where('name', '>=', search)
-                .where('name', '<=', search + '\uf8ff');
-            // If we have search, Firestore forced us to sort by 'name' anyway or it fails.
-            // But search is usually specific enough.
-        }
-        // Server-side category filter
-        if (categoryId && categoryId !== 'all') {
-            query = query.where('categoryId', '==', categoryId);
-        }
         // Execute query without strict limit to allow memory sorting
         // We use a high limit (5000) as a safety measure for small-medium inventories
         const snapshot = yield query.limit(5000).get();
-        // If no results with categoryId, try legacy category field for older data
-        let docs = snapshot.docs;
-        if (docs.length === 0 && categoryId && categoryId !== 'all' && !search) {
-            const legacySnapshot = yield firebase_1.collections.products
-                .where('category', '==', categoryId)
-                .limit(5000)
-                .get();
-            docs = legacySnapshot.docs;
-        }
-        let allDocs = docs.map(doc => {
+        let allDocs = snapshot.docs.map(doc => {
             const data = doc.data();
-            const normalizedData = Object.assign(Object.assign({ id: doc.id }, data), { name: data.name || '', categoryId: data.categoryId || data.category || 'products', categoryName: data.categoryName || (data.category ? data.category.charAt(0).toUpperCase() + data.category.slice(1) : 'General Product'), type: data.categoryId || data.category || 'products', low_stock_threshold: data.min_stock || 10 });
-            return normalizedData;
+            // Normalize for both new and legacy structures
+            const productName = data.productName || data.name || '';
+            const rawCategoryId = data.categoryId || '';
+            const rawCategoryName = data.categoryName || '';
+            const rawCategory = data.category || '';
+            const categoryName = rawCategoryName ||
+                KNOWN_CATEGORY_NAMES[rawCategory] ||
+                (rawCategory && rawCategory !== rawCategoryId ? rawCategory : '') ||
+                KNOWN_CATEGORY_NAMES[rawCategoryId] ||
+                'General Product';
+            const counterPrice = data.counterPrice || data.price || 0;
+            const distributionPrice = data.distributionPrice || data.distribution_price || 0;
+            const costPrice = data.costPrice || data.cost_price || counterPrice;
+            const stock = data.stock || data.stock_quantity || 0;
+            const thresholdLimit = data.thresholdLimit || data.min_stock || data.low_stock_threshold || 5;
+            const isLowStock = stock <= thresholdLimit;
+            return Object.assign(Object.assign({ id: doc.id }, data), { 
+                // New fields
+                productName, category: categoryName, costPrice,
+                counterPrice,
+                distributionPrice,
+                stock,
+                thresholdLimit, isActive: data.isActive !== false, is_low_stock: isLowStock, 
+                // Legacy fields for compatibility
+                name: productName, categoryId: rawCategoryId || rawCategory || 'products', categoryName: categoryName, unit: data.unit || 'packets', price: counterPrice, distribution_price: distributionPrice, cost_price: costPrice, min_stock: thresholdLimit, low_stock_threshold: thresholdLimit, stock_quantity: stock });
         });
+        // Apply category filter in memory (since categories are stored as names now)
+        if (categoryId && categoryId !== 'all') {
+            const targetCategory = KNOWN_CATEGORY_NAMES[categoryId] || categoryId;
+            const targetKeys = new Set([
+                categoryId,
+                targetCategory,
+                normalizeCategoryValue(categoryId),
+                normalizeCategoryValue(targetCategory),
+            ].filter(Boolean));
+            allDocs = allDocs.filter(doc => {
+                const productCategoryKeys = [
+                    doc.category,
+                    doc.categoryName,
+                    doc.categoryId,
+                    normalizeCategoryValue(doc.category),
+                    normalizeCategoryValue(doc.categoryName),
+                    normalizeCategoryValue(doc.categoryId),
+                ].filter(Boolean);
+                return productCategoryKeys.some(value => targetKeys.has(value));
+            });
+        }
+        // Apply search filter in memory
+        if (search) {
+            const searchLower = search.toLowerCase();
+            allDocs = allDocs.filter(doc => doc.productName.toLowerCase().includes(searchLower) ||
+                doc.name.toLowerCase().includes(searchLower));
+        }
         // Perform in-memory sorting
-        allDocs.sort((a, b) => (String(a.name) || '').localeCompare(String(b.name) || ''));
+        allDocs.sort((a, b) => (String(a.productName) || '').localeCompare(String(b.productName) || ''));
         // Client-side pagination matching the API request
         const start = (page - 1) * limit;
         const data = allDocs.slice(start, start + limit);
-        // Count for total results found
-        let totalCount = allDocs.length;
-        // Defensive count: use aggregation if available, otherwise use fetched list size
-        if (!categoryId || categoryId === 'all') {
-            if (!search) {
-                try {
-                    const countSnapshot = yield firebase_1.collections.products.count().get();
-                    totalCount = countSnapshot.data().count;
-                }
-                catch (e) {
-                    console.warn('Firestore count() failed, falling back to document length:', e);
-                    // totalCount already set to allDocs.length
-                }
-            }
-        }
         res.json({
             data,
-            count: totalCount,
+            count: allDocs.length,
             page,
-            totalPages: Math.ceil(totalCount / limit)
+            totalPages: Math.ceil(allDocs.length / limit)
         });
     }
     catch (error) {
@@ -85,20 +114,29 @@ router.get('/', auth_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void
 }));
 router.post('/', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(schemas_1.ProductSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { name, categoryId, categoryName, unit, price, distribution_price, cost_price, low_stock_threshold, reorder_level, track_expiry, expiry_date } = req.body;
+        const { name, categoryId, categoryName, unit, price, distribution_price, cost_price, low_stock_threshold, reorder_level, track_expiry, expiry_date, productName, category, costPrice, counterPrice, distributionPrice, thresholdLimit, isActive } = req.body;
         const newProduct = {
-            name,
-            categoryId,
-            categoryName,
-            category: categoryId, // Keep for backward compatibility
-            unit: unit || 'unit',
-            price: parseFloat(price) || 0,
-            distribution_price: parseFloat(distribution_price) || 0,
-            cost_price: parseFloat(cost_price) || 0,
-            min_stock: parseInt((low_stock_threshold || reorder_level)) || 10,
+            productName: productName || name || '',
+            category: category || categoryName || KNOWN_CATEGORY_NAMES[categoryId] || 'General Product',
+            costPrice: costPrice || counterPrice || price || 0,
+            counterPrice: counterPrice || price || 0,
+            distributionPrice: distributionPrice || distribution_price || 0,
+            stock: 0,
+            thresholdLimit: thresholdLimit || low_stock_threshold || reorder_level || 5,
+            isActive: isActive !== false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            // Legacy fields for compatibility
+            name: productName || name || '',
+            categoryId: categoryId || category || 'products',
+            categoryName: categoryName || category || KNOWN_CATEGORY_NAMES[categoryId] || 'General Product',
+            unit: unit || 'packets',
+            price: counterPrice || price || 0,
+            distribution_price: distributionPrice || distribution_price || 0,
+            cost_price: costPrice || cost_price || counterPrice || 0,
+            min_stock: thresholdLimit || low_stock_threshold || 5,
             track_expiry: !!track_expiry,
             expiry_date: expiry_date || null,
-            created_at: new Date().toISOString()
         };
         const docRef = yield firebase_1.collections.products.add(newProduct);
         const doc = yield docRef.get();
@@ -111,31 +149,47 @@ router.post('/', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(sche
 router.put('/:id', auth_1.requireAuth, (0, validateRequest_1.validateRequest)(schemas_1.ProductSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { name, categoryId, categoryName, unit, price, distribution_price, cost_price, low_stock_threshold, reorder_level, track_expiry, expiry_date } = req.body;
+        const { name, categoryId, categoryName, unit, price, distribution_price, cost_price, low_stock_threshold, reorder_level, track_expiry, expiry_date, productName, category, costPrice, counterPrice, distributionPrice, thresholdLimit, isActive } = req.body;
         const updates = {};
-        if (name !== undefined)
-            updates.name = name;
-        if (categoryId !== undefined) {
-            updates.categoryId = categoryId;
-            updates.category = categoryId; // Backwards compatibility
+        if (name !== undefined || productName !== undefined) {
+            updates.productName = productName || name;
+            updates.name = productName || name;
         }
-        if (categoryName !== undefined)
-            updates.categoryName = categoryName;
-        if (unit !== undefined)
+        if (category !== undefined || categoryName !== undefined || categoryId !== undefined) {
+            updates.category = category || categoryName || KNOWN_CATEGORY_NAMES[categoryId] || categoryId;
+            updates.categoryName = categoryName || category || KNOWN_CATEGORY_NAMES[categoryId] || categoryId;
+            updates.categoryId = categoryId || category;
+        }
+        if (costPrice !== undefined || cost_price !== undefined) {
+            updates.costPrice = costPrice || cost_price;
+            updates.cost_price = costPrice || cost_price;
+        }
+        if (counterPrice !== undefined || price !== undefined) {
+            updates.counterPrice = counterPrice || price;
+            updates.price = counterPrice || price;
+        }
+        if (distributionPrice !== undefined || distribution_price !== undefined) {
+            updates.distributionPrice = distributionPrice || distribution_price;
+            updates.distribution_price = distributionPrice || distribution_price;
+        }
+        if (thresholdLimit !== undefined || low_stock_threshold !== undefined || reorder_level !== undefined) {
+            updates.thresholdLimit = thresholdLimit || low_stock_threshold || reorder_level;
+            updates.min_stock = thresholdLimit || low_stock_threshold || reorder_level;
+            updates.low_stock_threshold = thresholdLimit || low_stock_threshold || reorder_level;
+        }
+        if (isActive !== undefined) {
+            updates.isActive = isActive;
+        }
+        if (unit !== undefined) {
             updates.unit = unit;
-        if (price !== undefined)
-            updates.price = parseFloat(price);
-        if (distribution_price !== undefined)
-            updates.distribution_price = parseFloat(distribution_price);
-        if (cost_price !== undefined)
-            updates.cost_price = parseFloat(cost_price);
-        if (low_stock_threshold !== undefined || reorder_level !== undefined) {
-            updates.min_stock = parseInt((low_stock_threshold || reorder_level));
         }
-        if (track_expiry !== undefined)
+        if (track_expiry !== undefined) {
             updates.track_expiry = track_expiry;
-        if (expiry_date !== undefined)
-            updates.expiry_date = expiry_date || null;
+        }
+        if (expiry_date !== undefined) {
+            updates.expiry_date = expiry_date;
+        }
+        updates.updatedAt = new Date().toISOString();
         yield firebase_1.collections.products.doc(id).update(updates);
         const doc = yield firebase_1.collections.products.doc(id).get();
         res.json([Object.assign({ id: doc.id }, doc.data())]);

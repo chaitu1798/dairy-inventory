@@ -17,6 +17,8 @@ const customers_1 = __importDefault(require("./routes/customers"));
 const finance_1 = __importDefault(require("./routes/finance"));
 const stock_1 = __importDefault(require("./routes/stock"));
 const upload_1 = __importDefault(require("./routes/upload"));
+const admin_1 = __importDefault(require("./routes/admin"));
+const categories_1 = __importDefault(require("./routes/categories"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -79,6 +81,8 @@ app.use('/customers', customers_1.default);
 app.use('/finance', finance_1.default);
 app.use('/stock', stock_1.default);
 app.use('/upload', uploadLimiter, upload_1.default);
+app.use('/admin', admin_1.default);
+app.use('/categories', categories_1.default);
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

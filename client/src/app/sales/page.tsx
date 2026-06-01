@@ -36,7 +36,7 @@ import ConfirmationDialog from '../../components/ui/ConfirmationDialog';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 import { useFilteredProducts } from '../../hooks/useFilteredProducts';
-import { CATEGORIES } from '../../constants/categories';
+import { useCategories } from '../../context/CategoryContext';
 
 const salesSchema = z.object({
     categoryId: z.string().min(1, 'Category is required'),
@@ -61,6 +61,7 @@ type SalesFormData = z.infer<typeof salesSchema>;
 type SaleType = 'counter' | 'distribution';
 
 export default function SalesPage() {
+    const { categories } = useCategories();
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const { products: filteredProducts, loading: productsLoading } = useFilteredProducts(selectedCategoryId);
     const [allProducts, setAllProducts] = useState<Product[]>([]); 
@@ -325,7 +326,7 @@ export default function SalesPage() {
                                         setValue('product_id', ''); // Reset product
                                     }}
                                     error={errors.categoryId}
-                                    options={CATEGORIES.map(c => ({ value: c.id, label: c.name }))}
+                                    options={categories.map(c => ({ value: c.id, label: c.name }))}
                                     placeholder="Choose category first"
                                     className="bg-white"
                                 />

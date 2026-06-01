@@ -6,6 +6,24 @@ import { ProductSchema } from '../schemas';
 
 const router = Router();
 
+const KNOWN_CATEGORY_NAMES: Record<string, string> = {
+    'milk-products': 'Milk Products',
+    'lassi-items': 'Lassi Items',
+    'curd-paneer': 'Curd & Paneer',
+    'ghee': 'Ghee',
+    'breads-cakes-biscuits': 'Breads Cakes & Biscuits',
+    'sweets': 'Sweets',
+    'savory-snacks-others': 'Savory Snacks & Others',
+};
+
+const normalizeCategoryValue = (value: unknown) =>
+    String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
 router.get('/', requireAuth, async (req, res) => {
     try {
         const page = parseInt(req.query.page as string) || 1;
@@ -25,7 +43,15 @@ router.get('/', requireAuth, async (req, res) => {
             
             // Normalize for both new and legacy structures
             const productName = data.productName || data.name || '';
-            const categoryName = data.category || data.categoryName || 'General Product';
+            const rawCategoryId = data.categoryId || '';
+            const rawCategoryName = data.categoryName || '';
+            const rawCategory = data.category || '';
+            const categoryName =
+                rawCategoryName ||
+                KNOWN_CATEGORY_NAMES[rawCategory] ||
+                (rawCategory && rawCategory !== rawCategoryId ? rawCategory : '') ||
+                KNOWN_CATEGORY_NAMES[rawCategoryId] ||
+                'General Product';
             const counterPrice = data.counterPrice || data.price || 0;
             const distributionPrice = data.distributionPrice || data.distribution_price || 0;
             const costPrice = data.costPrice || data.cost_price || counterPrice;
@@ -48,7 +74,7 @@ router.get('/', requireAuth, async (req, res) => {
                 is_low_stock: isLowStock,
                 // Legacy fields for compatibility
                 name: productName,
-                categoryId: data.categoryId || data.category || 'products',
+                categoryId: rawCategoryId || rawCategory || 'products',
                 categoryName: categoryName,
                 unit: data.unit || 'packets',
                 price: counterPrice,
@@ -62,21 +88,26 @@ router.get('/', requireAuth, async (req, res) => {
 
         // Apply category filter in memory (since categories are stored as names now)
         if (categoryId && categoryId !== 'all') {
-            const categoryMap: Record<string, string> = {
-                'milk-products': 'Milk Products',
-                'lassi-items': 'Lassi Items',
-                'curd-paneer': 'Curd & Paneer',
-                'ghee': 'Ghee',
-                'breads-cakes-biscuits': 'Breads Cakes & Biscuits',
-                'sweets': 'Sweets',
-                'savory-snacks-others': 'Savory Snacks & Others',
-            };
-            const targetCategory = categoryMap[categoryId] || categoryId;
-            allDocs = allDocs.filter(doc => 
-                doc.category === targetCategory || 
-                doc.categoryName === targetCategory ||
-                doc.categoryId === categoryId
-            );
+            const targetCategory = KNOWN_CATEGORY_NAMES[categoryId] || categoryId;
+            const targetKeys = new Set([
+                categoryId,
+                targetCategory,
+                normalizeCategoryValue(categoryId),
+                normalizeCategoryValue(targetCategory),
+            ].filter(Boolean));
+
+            allDocs = allDocs.filter(doc => {
+                const productCategoryKeys = [
+                    doc.category,
+                    doc.categoryName,
+                    doc.categoryId,
+                    normalizeCategoryValue(doc.category),
+                    normalizeCategoryValue(doc.categoryName),
+                    normalizeCategoryValue(doc.categoryId),
+                ].filter(Boolean);
+
+                return productCategoryKeys.some(value => targetKeys.has(value));
+            });
         }
 
         // Apply search filter in memory
@@ -131,7 +162,7 @@ router.post('/', requireAuth, validateRequest(ProductSchema), async (req, res) =
 
         const newProduct = {
             productName: productName || name || '',
-            category: category || categoryName || 'General Product',
+            category: category || categoryName || KNOWN_CATEGORY_NAMES[categoryId] || 'General Product',
             costPrice: costPrice || counterPrice || price || 0,
             counterPrice: counterPrice || price || 0,
             distributionPrice: distributionPrice || distribution_price || 0,
@@ -143,8 +174,7 @@ router.post('/', requireAuth, validateRequest(ProductSchema), async (req, res) =
             // Legacy fields for compatibility
             name: productName || name || '',
             categoryId: categoryId || category || 'products',
-            categoryName: category || categoryName || 'General Product',
-            category: category || categoryId,
+            categoryName: categoryName || category || KNOWN_CATEGORY_NAMES[categoryId] || 'General Product',
             unit: unit || 'packets',
             price: counterPrice || price || 0,
             distribution_price: distributionPrice || distribution_price || 0,
@@ -193,8 +223,8 @@ router.put('/:id', requireAuth, validateRequest(ProductSchema), async (req, res)
             updates.name = productName || name;
         }
         if (category !== undefined || categoryName !== undefined || categoryId !== undefined) {
-            updates.category = category || categoryName || categoryId;
-            updates.categoryName = category || categoryName;
+            updates.category = category || categoryName || KNOWN_CATEGORY_NAMES[categoryId] || categoryId;
+            updates.categoryName = categoryName || category || KNOWN_CATEGORY_NAMES[categoryId] || categoryId;
             updates.categoryId = categoryId || category;
         }
         if (costPrice !== undefined || cost_price !== undefined) {

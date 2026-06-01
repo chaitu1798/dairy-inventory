@@ -43,6 +43,7 @@ import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 
 import { useCategories } from '../../context/CategoryContext';
+import { getCategoryName, getCategoryOptions, getProductCategoryId } from '../../utils/categories';
 
 const productSchema = z.object({
     name: z.string().min(1, 'Product name is required'),
@@ -77,6 +78,7 @@ type StockUpdateFormData = z.infer<typeof stockUpdateSchema>;
 
 export default function ProductsPage() {
     const { categories } = useCategories();
+    const categoryOptions = getCategoryOptions(categories);
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -212,6 +214,7 @@ export default function ProductsPage() {
     };
 
     const handleEdit = (product: Product) => {
+        const categoryId = getProductCategoryId(categoryOptions, product) || 'products';
         setIsEditing(true);
         setEditId(product.id);
         reset({
@@ -220,8 +223,8 @@ export default function ProductsPage() {
             price: product.price,
             distribution_price: product.distribution_price || 0,
             cost_price: product.cost_price || 0,
-            categoryId: product.categoryId || product.category || 'products',
-            categoryName: product.categoryName || getCategoryName(product.categoryId || product.category || 'products'),
+            categoryId,
+            categoryName: product.categoryName || getCategoryName(categoryOptions, categoryId),
             track_expiry: product.track_expiry || false,
             expiry_date: product.expiry_date ? product.expiry_date.split('T')[0] : ''
         });
@@ -441,10 +444,10 @@ export default function ProductsPage() {
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             setValue('categoryId', val);
-                                            setValue('categoryName', categories.find(c => c.id === val)?.name || '');
+                                            setValue('categoryName', getCategoryName(categoryOptions, val));
                                         }}
                                         error={errors.categoryId}
-                                        options={categories.map(c => ({ value: c.id, label: c.name }))}
+                                        options={categoryOptions.map(c => ({ value: c.id, label: c.name }))}
                                         className="bg-white"
                                     />
                                 </div>
@@ -580,7 +583,7 @@ export default function ProductsPage() {
                                     className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
                                 >
                                     <option value="all">Every Category</option>
-                                    {categories.map(c => (
+                                    {categoryOptions.map(c => (
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                     ))}
                                 </select>

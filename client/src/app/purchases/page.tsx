@@ -38,6 +38,7 @@ import { cn } from '../../lib/utils';
 import Modal from '../../components/ui/Modal';
 import { useFilteredProducts } from '../../hooks/useFilteredProducts';
 import { useCategories } from '../../context/CategoryContext';
+import { getCategoryOptions, getProductCategoryId } from '../../utils/categories';
 
 const purchaseSchema = z.object({
     categoryId: z.string().min(1, 'Category is required'),
@@ -52,6 +53,7 @@ type PurchaseFormData = z.infer<typeof purchaseSchema>;
 
 export default function PurchasesPage() {
     const { categories } = useCategories();
+    const categoryOptions = getCategoryOptions(categories);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const { products: filteredProducts, loading: productsLoading } = useFilteredProducts(selectedCategoryId);
     const [allProducts, setAllProducts] = useState<Product[]>([]); // For existing list display
@@ -204,7 +206,7 @@ export default function PurchasesPage() {
 
     const handleEdit = (purchase: Purchase) => {
         const product = allProducts.find((p: Product) => String(p.id) === String(purchase.product_id));
-        const catId = product?.categoryId || product?.category || 'products';
+        const catId = getProductCategoryId(categoryOptions, product) || 'products';
         
         setSelectedCategoryId(catId);
         setValue('categoryId', catId);
@@ -294,7 +296,7 @@ export default function PurchasesPage() {
                     productName.toLowerCase().includes(p.name.toLowerCase())
                 );
                 if (matchedProduct) {
-                    const catId = matchedProduct.categoryId || matchedProduct.category || 'products';
+                    const catId = getProductCategoryId(categoryOptions, matchedProduct) || 'products';
                     setSelectedCategoryId(catId);
                     setValue('categoryId', catId);
                     setValue('product_id', String(matchedProduct.id));
@@ -388,7 +390,7 @@ export default function PurchasesPage() {
                                         setValue('product_id', ''); // Reset product
                                     }}
                                     error={errors.categoryId}
-                                    options={categories.map(c => ({ value: c.id, label: c.name }))}
+                                    options={categoryOptions.map(c => ({ value: c.id, label: c.name }))}
                                     placeholder="Choose category first"
                                     className="bg-white"
                                 />

@@ -27,7 +27,7 @@ export const useFilteredProducts = (categoryId?: string): UseFilteredProductsRes
             
             let url = `/products?limit=1000`; 
             if (categoryId !== 'all') {
-                url += `&categoryId=${categoryId}`;
+                url += `&categoryId=${encodeURIComponent(categoryId)}`;
             }
 
             const res = await api.get(url);

@@ -12,6 +12,7 @@ const KNOWN_CATEGORY_NAMES: Record<string, string> = {
     'curd-paneer': 'Curd & Paneer',
     'ghee': 'Ghee',
     'breads-cakes-biscuits': 'Breads Cakes & Biscuits',
+    'bread-cakes-biscuits': 'Bread Cakes & Biscuits',
     'sweets': 'Sweets',
     'savory-snacks-others': 'Savory Snacks & Others',
 };
@@ -31,6 +32,14 @@ router.get('/', requireAuth, async (req, res) => {
         const search = (req.query.search as string || '').trim();
         const categoryId = req.query.categoryId as string || '';
 
+        let requestedCategoryName = '';
+        if (categoryId && categoryId !== 'all' && !KNOWN_CATEGORY_NAMES[categoryId]) {
+            const categoryDoc = await collections.categories.doc(categoryId).get();
+            if (categoryDoc.exists) {
+                requestedCategoryName = String(categoryDoc.data()?.name || '');
+            }
+        }
+
         // Build query — remove orderBy from Firestore to avoid composite index requirement
         let query: FirebaseFirestore.Query = collections.products;
 
@@ -49,8 +58,10 @@ router.get('/', requireAuth, async (req, res) => {
             const categoryName =
                 rawCategoryName ||
                 KNOWN_CATEGORY_NAMES[rawCategory] ||
+                KNOWN_CATEGORY_NAMES[normalizeCategoryValue(rawCategory)] ||
                 (rawCategory && rawCategory !== rawCategoryId ? rawCategory : '') ||
                 KNOWN_CATEGORY_NAMES[rawCategoryId] ||
+                KNOWN_CATEGORY_NAMES[normalizeCategoryValue(rawCategoryId)] ||
                 'General Product';
             const counterPrice = data.counterPrice || data.price || 0;
             const distributionPrice = data.distributionPrice || data.distribution_price || 0;
@@ -88,7 +99,11 @@ router.get('/', requireAuth, async (req, res) => {
 
         // Apply category filter in memory (since categories are stored as names now)
         if (categoryId && categoryId !== 'all') {
-            const targetCategory = KNOWN_CATEGORY_NAMES[categoryId] || categoryId;
+            const targetCategory =
+                requestedCategoryName ||
+                KNOWN_CATEGORY_NAMES[categoryId] ||
+                KNOWN_CATEGORY_NAMES[normalizeCategoryValue(categoryId)] ||
+                categoryId;
             const targetKeys = new Set([
                 categoryId,
                 targetCategory,

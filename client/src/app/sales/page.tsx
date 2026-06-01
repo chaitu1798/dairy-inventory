@@ -37,6 +37,7 @@ import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 import { useFilteredProducts } from '../../hooks/useFilteredProducts';
 import { useCategories } from '../../context/CategoryContext';
+import { getCategoryOptions, getProductCategoryId } from '../../utils/categories';
 
 const salesSchema = z.object({
     categoryId: z.string().min(1, 'Category is required'),
@@ -62,6 +63,7 @@ type SaleType = 'counter' | 'distribution';
 
 export default function SalesPage() {
     const { categories } = useCategories();
+    const categoryOptions = getCategoryOptions(categories);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const { products: filteredProducts, loading: productsLoading } = useFilteredProducts(selectedCategoryId);
     const [allProducts, setAllProducts] = useState<Product[]>([]); 
@@ -209,7 +211,7 @@ export default function SalesPage() {
 
     const handleEdit = (sale: Sale) => {
         const product = allProducts.find((p: Product) => String(p.id) === String(sale.product_id));
-        const catId = product?.categoryId || product?.category || 'products';
+        const catId = getProductCategoryId(categoryOptions, product) || 'products';
         
         setSelectedCategoryId(catId);
         setValue('categoryId', catId);
@@ -326,7 +328,7 @@ export default function SalesPage() {
                                         setValue('product_id', ''); // Reset product
                                     }}
                                     error={errors.categoryId}
-                                    options={categories.map(c => ({ value: c.id, label: c.name }))}
+                                    options={categoryOptions.map(c => ({ value: c.id, label: c.name }))}
                                     placeholder="Choose category first"
                                     className="bg-white"
                                 />

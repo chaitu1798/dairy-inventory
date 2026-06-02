@@ -5,10 +5,11 @@ import api from '../../../utils/api';
 import { Button } from '../../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/Card';
 import { toast } from 'sonner';
-import { Loader2, Upload, AlertTriangle, CheckCircle2, ShoppingCart, Camera } from 'lucide-react';
+import { Loader2, Upload, AlertTriangle, CheckCircle2, ShoppingCart, Camera, FileText } from 'lucide-react';
 import ConfirmationDialog from '../../../components/ui/ConfirmationDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/Table';
 import { useCategories } from '../../../context/CategoryContext';
+import * as XLSX from 'xlsx';
 
 export default function AdminImportPage() {
     const { refreshCategories } = useCategories();
@@ -87,6 +88,31 @@ export default function AdminImportPage() {
 
     const [purchaseDate, setPurchaseDate] = useState('2026-05-30');
     const [purchasePhoto, setPurchasePhoto] = useState<File | null>(null);
+    const [purchaseCSV, setPurchaseCSV] = useState<File | null>(null);
+    const [purchasePreview, setPurchasePreview] = useState<any[]>([]);
+    
+    const handlePurchaseCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setPurchaseCSV(file);
+            // Parse the CSV for preview
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = new Uint8Array(event.target?.result as ArrayBuffer);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    setPurchasePreview(jsonData);
+                    toast.success('CSV file loaded! Previewing first few items...');
+                } catch (error) {
+                    console.error('Error parsing CSV:', error);
+                    toast.error('Failed to parse CSV file');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    };
     
     const handleImportPurchases = async () => {
         setIsPurchasesImporting(true);
@@ -96,8 +122,10 @@ export default function AdminImportPage() {
             if (purchasePhoto) {
                 formData.append('image', purchasePhoto);
             }
+            if (purchaseCSV) {
+                formData.append('csv', purchaseCSV);
+            }
 
-            // Don't set Content-Type header manually, let axios set it with boundary!
             const importRes = await api.post('/admin/import-purchases', formData);
             
             if (importRes.data.success) {
@@ -146,13 +174,40 @@ export default function AdminImportPage() {
                                     className="w-full p-3 rounded-xl border border-slate-300"
                                 />
                             </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-slate-700">Upload CSV/Excel File (Optional)</label>
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                        <FileText className="w-4 h-4" />
+                                        <span className="text-sm font-semibold">
+                                            {purchaseCSV ? purchaseCSV.name : 'Choose CSV/Excel File'}
+                                        </span>
+                                        <input 
+                                            type="file"
+                                            accept=".csv,.xlsx,.xls"
+                                            onChange={handlePurchaseCSVUpload}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                    {purchaseCSV && (
+                                        <button 
+                                            onClick={() => { setPurchaseCSV(null); setPurchasePreview([]); }}
+                                            className="text-slate-500 hover:text-red-500"
+                                        >
+                                            X
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold text-slate-700">Upload Photo (Optional)</label>
                                 <div className="flex items-center gap-4">
                                     <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
                                         <Camera className="w-4 h-4" />
                                         <span className="text-sm font-semibold">
-                                            {purchasePhoto ? purchasePhoto.name : 'Choose File'}
+                                            {purchasePhoto ? purchasePhoto.name : 'Choose Photo'}
                                         </span>
                                         <input 
                                             type="file"
@@ -172,6 +227,35 @@ export default function AdminImportPage() {
                                 </div>
                             </div>
                         </div>
+                        {/* Preview CSV if uploaded */}
+                        {purchasePreview.length > 0 && (
+                            <Card className="border-slate-200">
+                                <CardHeader>
+                                    <CardTitle className="text-base">Purchase CSV Preview</CardTitle>
+                                </CardHeader>
+                                <CardContent className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                {Object.keys(purchasePreview[0]).map((key, idx) => (
+                                                    <TableHead key={idx}>{key}</TableHead>
+                                                ))}
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {purchasePreview.slice(0,5).map((row, idx) => (
+                                                <TableRow key={idx}>
+                                                    {Object.values(row).map((value, valIdx) => (
+                                                        <TableCell key={valIdx}>{String(value)}</TableCell>
+                                                    ))}
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                    {purchasePreview.length >5 && <p className="text-sm text-slate-500 mt-2">...and {purchasePreview.length-5} more</p>}
+                                </CardContent>
+                            </Card>
+                        )}
                         <Button 
                             onClick={handleImportPurchases}
                             disabled={isPurchasesImporting}

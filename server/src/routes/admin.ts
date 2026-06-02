@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { collections, db } from '../firebase';
 import { requireAuth } from '../middleware/auth';
 import multer from 'multer';
+import * as XLSX from 'xlsx';
 
 const NAME_TO_SLUG: Record<string, string> = {
     'Milk Products': 'milk-products',
@@ -11,10 +12,6 @@ const NAME_TO_SLUG: Record<string, string> = {
     'Breads Cakes & Biscuits': 'breads-cakes-biscuits',
     'Sweets': 'sweets',
     'Savory Snacks & Others': 'savory-snacks-others'
-};
-
-const normalizeString = (str: string) => {
-    return str.trim().replace(/\s+/g, ' ');
 };
 
 const purchaseData = [
@@ -63,7 +60,7 @@ const purchaseData = [
   { name: 'dood peda 250', quantity: 2 },
   { name: 'khalakand', quantity: 0 },
   { name: 'milkcace 500', quantity: 0 },
-  { name: 'mysorepak', quantity: 0 },
+  { name: 'myshorpac', quantity: 0 },
   { name: 'nuvvulu 200', quantity: 0 },
   { name: 'bodam milk', quantity: 165 },
   { name: 'lemon', quantity: 40 },
@@ -89,7 +86,7 @@ const router = Router();
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 }
+    limits: { fileSize: 50 * 1024 * 1024 }
 });
 
 // Helper to normalize string (trim, replace multiple spaces)
@@ -327,10 +324,10 @@ router.get('/preview', requireAuth, async (req, res) => {
     });
 });
 
-router.post('/import-purchases', requireAuth, upload.single('image'), async (req, res) => {
+router.post('/import-purchases', requireAuth, upload.fields([{ name: 'image' }, { name: 'csv' }]), async (req, res) => {
     try {
         const batch = db.batch();
-        let purchaseDate = req.body.purchaseDate || '2026-05-30';
+        let purchaseDate = req.body.purchaseDate || new Date().toISOString().split('T')[0];
         let importedCount = 0;
 
         const productsSnapshot = await collections.products.get();
@@ -341,27 +338,61 @@ router.post('/import-purchases', requireAuth, upload.single('image'), async (req
 
         let itemsToImport = purchaseData;
         
-        // TODO: Add real OCR/AI parsing here when photo is uploaded
-        // For now, use the existing purchase data even when photo is uploaded
-        // Later, parse the photo to extract items
+        // Parse CSV if provided
+        if (req.files && 'csv' in req.files && req.files.csv.length > 0) {
+            const csvFile = req.files.csv[0];
+            const workbook = XLSX.read(csvFile.buffer);
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            itemsToImport = XLSX.utils.sheet_to_json(firstSheet);
+            console.log('Parsed purchases from CSV:', itemsToImport);
+        }
 
         for (const item of itemsToImport) {
-            if (item.quantity <= 0) continue;
+            // Support different column name variations (productName, name, product, product_name, etc.)
+            const itemName = String(
+                (item as any).productName ||
+                (item as any).name ||
+                (item as any).product ||
+                (item as any).product_name ||
+                ''
+            );
+            const itemQuantity = Number(
+                (item as any).quantity ||
+                (item as any).qty ||
+                0
+            );
+
+            if (!itemName || itemQuantity <= 0) continue;
 
             const product = products.find(p => 
-                p.name.toLowerCase() === item.name.toLowerCase() ||
-                p.productName?.toLowerCase() === item.name.toLowerCase()
+                p.name?.toLowerCase() === itemName.toLowerCase() ||
+                p.productName?.toLowerCase() === itemName.toLowerCase()
             );
 
             if (product) {
                 const purchaseRef = collections.purchases.doc();
+                const itemPrice = Number(
+                    (item as any).price ||
+                    (item as any).costPrice ||
+                    (item as any).cost_price ||
+                    product.cost_price ||
+                    product.costPrice ||
+                    0
+                );
+                const itemTotal = Number(
+                    (item as any).total ||
+                    (item as any).amount ||
+                    itemQuantity * itemPrice
+                );
+                const itemExpiry = (item as any).expiry_date || (item as any).expiryDate || null;
+                
                 batch.set(purchaseRef, {
                     product_id: product.id,
-                    quantity: item.quantity,
-                    price: product.cost_price || product.costPrice || 0,
-                    total: item.quantity * (product.cost_price || product.costPrice || 0),
+                    quantity: itemQuantity,
+                    price: itemPrice,
+                    total: itemTotal,
                     purchase_date: purchaseDate,
-                    expiry_date: null,
+                    expiry_date: itemExpiry,
                     created_at: new Date().toISOString()
                 });
                 importedCount++;
@@ -375,11 +406,145 @@ router.post('/import-purchases', requireAuth, upload.single('image'), async (req
             message: 'Purchases imported successfully',
             importedCount,
             totalItems: itemsToImport.length,
-            usedPhoto: !!req.file
+            usedPhoto: !!(req.files && 'image' in req.files && req.files.image.length > 0),
+            usedCSV: !!(req.files && 'csv' in req.files && req.files.csv.length > 0)
         });
     } catch (error) {
         console.error('Import purchases failed:', error);
         res.status(500).json({ success: false, error: 'Failed to import purchases' });
+    }
+});
+
+// Import Sales
+router.post('/import-sales', requireAuth, upload.single('csv'), async (req, res) => {
+    try {
+        const batch = db.batch();
+        let saleDate = req.body.saleDate || new Date().toISOString().split('T')[0];
+        let importedCount = 0;
+
+        const productsSnapshot = await collections.products.get();
+        const products = productsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data() as any
+        }));
+
+        let itemsToImport: any[] = [];
+        
+        // Parse CSV if provided
+        if (req.file) {
+            const workbook = XLSX.read(req.file.buffer);
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            itemsToImport = XLSX.utils.sheet_to_json(firstSheet);
+            console.log('Parsed sales from CSV:', itemsToImport);
+        }
+
+        for (const item of itemsToImport) {
+            // Support different column name variations
+            const itemName = String(
+                item.productName ||
+                item.name ||
+                item.product ||
+                item.product_name ||
+                ''
+            );
+            const itemQuantity = Number(
+                item.quantity ||
+                item.qty ||
+                0
+            );
+
+            if (!itemName || itemQuantity <= 0) continue;
+
+            const product = products.find(p => 
+                (p.name?.toLowerCase() === itemName.toLowerCase() ||
+                p.productName?.toLowerCase() === itemName.toLowerCase()
+            ));
+
+            if (product) {
+                const itemPrice = Number(
+                    item.price ||
+                    item.salePrice ||
+                    item.sale_price ||
+                    product.price ||
+                    product.counterPrice ||
+                    0
+                );
+                const itemTotal = Number(
+                    item.total ||
+                    item.amount ||
+                    itemQuantity * itemPrice
+                );
+                const itemStatus = String(
+                    item.status ||
+                    'paid'
+                );
+                const customerName = String(
+                    item.customerName ||
+                    item.customer_name ||
+                    item.customer ||
+                    ''
+                );
+                const itemSaleDate = String(
+                    item.saleDate ||
+                    item.sale_date ||
+                    saleDate
+                );
+
+                // First, create or get customer
+                let customerId = null;
+                if (customerName) {
+                    const customerSnapshot = await collections.customers
+                        .where('name', '==', customerName)
+                        .limit(1)
+                        .get();
+                    
+                    if (customerSnapshot.empty) {
+                        const customerDoc = collections.customers.doc();
+                        batch.set(customerDoc, {
+                            name: customerName,
+                            phone: null,
+                            email: null,
+                            address: null,
+                            balance: 0,
+                            created_at: new Date().toISOString()
+                        });
+                        customerId = customerDoc.id;
+                    } else {
+                        customerId = customerSnapshot.docs[0].id;
+                    }
+                }
+
+                // Create sale record
+                const saleRef = collections.sales.doc();
+                batch.set(saleRef, {
+                    product_id: product.id,
+                    customer_id: customerId,
+                    quantity: itemQuantity,
+                    price: itemPrice,
+                    total: itemTotal,
+                    sale_date: itemSaleDate,
+                    sale_type: 'counter',
+                    status: itemStatus as 'paid' | 'pending' | 'overdue',
+                    due_date: itemStatus === 'pending' ? itemSaleDate : null,
+                    amount_paid: itemStatus === 'paid' ? itemTotal : 0,
+                    created_at: new Date().toISOString()
+                });
+                importedCount++;
+            }
+        }
+
+        await batch.commit();
+
+        res.json({
+            success: true,
+            message: 'Sales imported successfully',
+            importedCount,
+            totalItems: itemsToImport.length,
+            usedCSV: !!req.file
+        });
+    } catch (error) {
+        console.error('Import sales failed:', error);
+        res.status(500).json({ success: false, error: 'Failed to import sales' });
     }
 });
 

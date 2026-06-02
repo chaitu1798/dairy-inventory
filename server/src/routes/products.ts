@@ -26,29 +26,38 @@ const normalizeCategoryValue = (value: unknown) =>
         .replace(/^-|-$/g, '');
 
 router.get('/', requireAuth, async (req, res) => {
-    try {
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 50;
-        const search = (req.query.search as string || '').trim();
-        const categoryId = req.query.categoryId as string || '';
+  console.log('[products GET] Request received with params:', {
+    page: req.query.page,
+    limit: req.query.limit,
+    search: req.query.search,
+    categoryId: req.query.categoryId
+  });
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const search = (req.query.search as string || '').trim();
+    const categoryId = req.query.categoryId as string || '';
 
-        let requestedCategoryName = '';
-        if (categoryId && categoryId !== 'all' && !KNOWN_CATEGORY_NAMES[categoryId]) {
-            const categoryDoc = await collections.categories.doc(categoryId).get();
-            if (categoryDoc.exists) {
-                requestedCategoryName = String(categoryDoc.data()?.name || '');
-            }
-        }
+    let requestedCategoryName = '';
+    if (categoryId && categoryId !== 'all' && !KNOWN_CATEGORY_NAMES[categoryId]) {
+      const categoryDoc = await collections.categories.doc(categoryId).get();
+      if (categoryDoc.exists) {
+        requestedCategoryName = String(categoryDoc.data()?.name || '');
+      }
+    }
+    console.log('[products GET] requestedCategoryName:', requestedCategoryName);
 
-        // Build query — remove orderBy from Firestore to avoid composite index requirement
-        let query: FirebaseFirestore.Query = collections.products;
+    // Build query — remove orderBy from Firestore to avoid composite index requirement
+    let query: FirebaseFirestore.Query = collections.products;
 
-        // Execute query without strict limit to allow memory sorting
-        // We use a high limit (5000) as a safety measure for small-medium inventories
-        const snapshot = await query.limit(5000).get();
+    // Execute query without strict limit to allow memory sorting
+    // We use a high limit (5000) as a safety measure for small-medium inventories
+    const snapshot = await query.limit(5000).get();
+    console.log('[products GET] Number of products from Firestore:', snapshot.size);
 
-        let allDocs = snapshot.docs.map(doc => {
-            const data = doc.data() as any;
+    let allDocs = snapshot.docs.map(doc => {
+      const data = doc.data() as any;
+      console.log('[products GET] Raw product from Firestore:', { id: doc.id, ...data });
             
             // Normalize for both new and legacy structures
             const productName = data.productName || data.name || '';
@@ -98,55 +107,63 @@ router.get('/', requireAuth, async (req, res) => {
         });
 
         // Apply category filter in memory (since categories are stored as names now)
-        if (categoryId && categoryId !== 'all') {
-            const targetCategory =
-                requestedCategoryName ||
-                KNOWN_CATEGORY_NAMES[categoryId] ||
-                KNOWN_CATEGORY_NAMES[normalizeCategoryValue(categoryId)] ||
-                categoryId;
-            const targetKeys = new Set([
-                categoryId,
-                targetCategory,
-                normalizeCategoryValue(categoryId),
-                normalizeCategoryValue(targetCategory),
-            ].filter(Boolean));
+    if (categoryId && categoryId !== 'all') {
+        console.log('[products GET] Applying category filter for:', categoryId);
+        const targetCategory =
+            requestedCategoryName ||
+            KNOWN_CATEGORY_NAMES[categoryId] ||
+            KNOWN_CATEGORY_NAMES[normalizeCategoryValue(categoryId)] ||
+            categoryId;
+        console.log('[products GET] targetCategory:', targetCategory);
+        
+        // Create a set of lowercased target keys for case-insensitive matching
+        const targetKeysLower = new Set([
+            categoryId.toLowerCase(),
+            targetCategory.toLowerCase(),
+            normalizeCategoryValue(categoryId), // already lowercased
+            normalizeCategoryValue(targetCategory), // already lowercased
+        ].filter(Boolean));
+        console.log('[products GET] targetKeysLower:', targetKeysLower);
 
-            allDocs = allDocs.filter(doc => {
-                const productCategoryKeys = [
-                    doc.category,
-                    doc.categoryName,
-                    doc.categoryId,
-                    normalizeCategoryValue(doc.category),
-                    normalizeCategoryValue(doc.categoryName),
-                    normalizeCategoryValue(doc.categoryId),
-                ].filter(Boolean);
-
-                return productCategoryKeys.some(value => targetKeys.has(value));
-            });
-        }
-
-        // Apply search filter in memory
-        if (search) {
-            const searchLower = search.toLowerCase();
-            allDocs = allDocs.filter(doc => 
-                doc.productName.toLowerCase().includes(searchLower) || 
-                doc.name.toLowerCase().includes(searchLower)
-            );
-        }
-
-        // Perform in-memory sorting
-        allDocs.sort((a, b) => (String(a.productName) || '').localeCompare(String(b.productName) || ''));
-
-        // Client-side pagination matching the API request
-        const start = (page - 1) * limit;
-        const data = allDocs.slice(start, start + limit);
-
-        res.json({
-            data,
-            count: allDocs.length,
-            page,
-            totalPages: Math.ceil(allDocs.length / limit)
+        allDocs = allDocs.filter(doc => {
+            const productCategoryKeysLower = [
+                (doc.category || '').toLowerCase(),
+                (doc.categoryName || '').toLowerCase(),
+                (doc.categoryId || '').toLowerCase(),
+                normalizeCategoryValue(doc.category),
+                normalizeCategoryValue(doc.categoryName),
+                normalizeCategoryValue(doc.categoryId),
+            ].filter(Boolean);
+            const matches = productCategoryKeysLower.some(value => targetKeysLower.has(value));
+            console.log('[products GET] Product', doc.productName, 'productCategoryKeysLower:', productCategoryKeysLower, 'matches:', matches);
+            return matches;
         });
+    }
+    console.log('[products GET] Number of products after category filter:', allDocs.length);
+
+    // Apply search filter in memory
+    if (search) {
+      const searchLower = search.toLowerCase();
+      allDocs = allDocs.filter(doc => 
+        doc.productName.toLowerCase().includes(searchLower) || 
+        doc.name.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Perform in-memory sorting
+    allDocs.sort((a, b) => (String(a.productName) || '').localeCompare(String(b.productName) || ''));
+
+    // Client-side pagination matching the API request
+    const start = (page - 1) * limit;
+    const data = allDocs.slice(start, start + limit);
+
+    console.log('[products GET] Sending response with count:', allDocs.length, 'data length:', data.length);
+    res.json({
+      data,
+      count: allDocs.length,
+      page,
+      totalPages: Math.ceil(allDocs.length / limit)
+    });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }

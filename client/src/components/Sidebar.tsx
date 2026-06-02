@@ -59,6 +59,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             title: "Admin",
             links: [
                 { href: '/admin/import-pricelist', label: 'Import Price List', icon: Settings },
+                { href: '/admin/import-sales', label: 'Import Sales', icon: FileBarChart },
             ]
         }
     ];

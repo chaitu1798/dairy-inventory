@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import api from '../../../../utils/api';
-import { Button } from '../../../../components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../../components/ui/Card';
+import api from '../../../utils/api';
+import { Button } from '../../../components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/Card';
 import { toast } from 'sonner';
 import { Loader2, Upload, CheckCircle2, FileText } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../../components/ui/Table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/Table';
 import * as XLSX from 'xlsx';
 
 export default function AdminImportSalesPage() {

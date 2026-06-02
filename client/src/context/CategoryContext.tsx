@@ -1,9 +1,15 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Category } from '../types';
 import api from '../utils/api';
 import { useAuth } from './AuthContext';
+
+interface Category {
+    id: string;
+    name: string;
+    isActive: boolean;
+    createdAt: string;
+}
 
 interface CategoryContextType {
     categories: Category[];

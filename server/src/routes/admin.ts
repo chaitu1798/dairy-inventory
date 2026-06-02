@@ -3,6 +3,20 @@ import { collections, db } from '../firebase';
 import { requireAuth } from '../middleware/auth';
 import multer from 'multer';
 
+const NAME_TO_SLUG: Record<string, string> = {
+    'Milk Products': 'milk-products',
+    'Lassi Items': 'lassi-items',
+    'Curd & Paneer': 'curd-paneer',
+    'Ghee': 'ghee',
+    'Breads Cakes & Biscuits': 'breads-cakes-biscuits',
+    'Sweets': 'sweets',
+    'Savory Snacks & Others': 'savory-snacks-others'
+};
+
+const normalizeString = (str: string) => {
+    return str.trim().replace(/\s+/g, ' ');
+};
+
 const purchaseData = [
   { name: 'ganga500', quantity: 192 },
   { name: 'ganga200', quantity: 136 },
@@ -152,83 +166,103 @@ router.delete('/delete-data', requireAuth, async (req, res) => {
 // --- STEP 3 & 4: IMPORT NEW PRICE LIST ---
 const priceListData = [
     { Category: 'Milk Products', 'Product Name': 'ganga500', 'Distribution Price': 27.5, 'Counter Price': 29 },
-    { Category: 'Milk Products', 'Product Name': 'dtn200', 'Distribution Price': 12.35, 'Counter Price': 68 },
-    { Category: 'Milk Products', 'Product Name': 'cooling', 'Distribution Price': 10, 'Counter Price': 11 },
+    { Category: 'Milk Products', 'Product Name': 'ganga200', 'Distribution Price': 12.5, 'Counter Price': 13 },
+    { Category: 'Milk Products', 'Product Name': 'dtm200', 'Distribution Price': 10.35, 'Counter Price': 11 },
+    { Category: 'Milk Products', 'Product Name': 'colling', 'Distribution Price': 64, 'Counter Price': 68 },
+    { Category: 'Milk Products', 'Product Name': 'colli', 'Distribution Price': 32, 'Counter Price': 34 },
     { Category: 'Milk Products', 'Product Name': 'butter milk', 'Distribution Price': 7, 'Counter Price': 8 },
-    { Category: 'Milk Products', 'Product Name': 'slim', 'Distribution Price': 23, 'Counter Price': 30 },
-    { Category: 'Milk Products', 'Product Name': 'ganga500 box', 'Distribution Price': 9, 'Counter Price': 10 },
-    { Category: 'Lassi Items', 'Product Name': 'lassi mango', 'Distribution Price': 11.5, 'Counter Price': 13 },
-    { Category: 'Lassi Items', 'Product Name': 'lassi', 'Distribution Price': 8.75, 'Counter Price': 10 },
-    { Category: 'Curd & Paneer', 'Product Name': 'curd500', 'Distribution Price': 13.5, 'Counter Price': 15 },
-    { Category: 'Curd & Paneer', 'Product Name': 'curd200', 'Distribution Price': 7, 'Counter Price': 8 },
-    { Category: 'Curd & Paneer', 'Product Name': 'curd', 'Distribution Price': 8, 'Counter Price': 10 },
-    { Category: 'Curd & Paneer', 'Product Name': '170 cups', 'Distribution Price': 8.15, 'Counter Price': 9 },
-    { Category: 'Curd & Paneer', 'Product Name': '1 lite tub', 'Distribution Price': 145, 'Counter Price': 165 },
-    { Category: 'Curd & Paneer', 'Product Name': '20 lite tub', 'Distribution Price': 95, 'Counter Price': 105 },
-    { Category: 'Curd & Paneer', 'Product Name': '5 lite tub', 'Distribution Price': 370, 'Counter Price': 405 },
-    { Category: 'Curd & Paneer', 'Product Name': 'paneer500', 'Distribution Price': 80, 'Counter Price': 85 },
-    { Category: 'Ghee', 'Product Name': 'cow ghee 200', 'Distribution Price': 635, 'Counter Price': 710 },
-    { Category: 'Ghee', 'Product Name': 'ghee500', 'Distribution Price': 1350, 'Counter Price': 1450 },
-    { Category: 'Breads Cakes & Biscuits', 'Product Name': '200 bred', 'Distribution Price': 27, 'Counter Price': 30 },
-    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'bread', 'Distribution Price': 8.5, 'Counter Price': 10 },
-    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'cake', 'Distribution Price': 17, 'Counter Price': 20 },
-    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'osmania20', 'Distribution Price': 32, 'Counter Price': 35 },
-    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'osmania40', 'Distribution Price': 54, 'Counter Price': 60 },
-    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'osmania120', 'Distribution Price': 110, 'Counter Price': 120 },
-    { Category: 'Sweets', 'Product Name': 'junnu', 'Distribution Price': 18, 'Counter Price': 16 },
-    { Category: 'Sweets', 'Product Name': 'peda200', 'Distribution Price': 13, 'Counter Price': 15 },
-    { Category: 'Sweets', 'Product Name': 'boddi per', 'Distribution Price': 250, 'Counter Price': 310 },
-    { Category: 'Sweets', 'Product Name': 'kakinada', 'Distribution Price': 160, 'Counter Price': 180 },
-    { Category: 'Savory Snacks & Others', 'Product Name': 'mysorepak', 'Distribution Price': 85, 'Counter Price': 95 },
-    { Category: 'Savory Snacks & Others', 'Product Name': 'khunnu 200', 'Distribution Price': 150, 'Counter Price': 170 },
-    { Category: 'Savory Snacks & Others', 'Product Name': 'zingo', 'Distribution Price': 11.5, 'Counter Price': 13 },
-    { Category: 'Savory Snacks & Others', 'Product Name': 'mango chogodu', 'Distribution Price': 23, 'Counter Price': 25 },
-    { Category: 'Savory Snacks & Others', 'Product Name': 'special muruku', 'Distribution Price': 55, 'Counter Price': 60 },
-    { Category: 'Savory Snacks & Others', 'Product Name': 'panch mukulu', 'Distribution Price': 65, 'Counter Price': 70 },
-    { Category: 'Savory Snacks & Others', 'Product Name': 'kaju mix 400', 'Distribution Price': 130, 'Counter Price': 145 },
+    { Category: 'Milk Products', 'Product Name': 'bodam milk', 'Distribution Price': 25, 'Counter Price': 30 },
+    { Category: 'Milk Products', 'Product Name': 'milk shake', 'Distribution Price': 23, 'Counter Price': 25 },
+    { Category: 'Milk Products', 'Product Name': 'slim', 'Distribution Price': 9, 'Counter Price': 10 },
+    { Category: 'Milk Products', 'Product Name': 'ganga 500 box', 'Distribution Price': 28, 'Counter Price': 30 },
+    { Category: 'Lassi Items', 'Product Name': 'lassi', 'Distribution Price': 11.5, 'Counter Price': 13 },
+    { Category: 'Lassi Items', 'Product Name': 'mango lassi', 'Distribution Price': 8.5, 'Counter Price': 10 },
+    { Category: 'Lassi Items', 'Product Name': 'lassi', 'Distribution Price': 13, 'Counter Price': 15 },
+    { Category: 'Curd & Paneer', 'Product Name': 'curd 80', 'Distribution Price': 5.75, 'Counter Price': 6 },
+    { Category: 'Curd & Paneer', 'Product Name': 'curd 180', 'Distribution Price': 13.5, 'Counter Price': 15 },
+    { Category: 'Curd & Paneer', 'Product Name': 'curd 425', 'Distribution Price': 27, 'Counter Price': 30 },
+    { Category: 'Curd & Paneer', 'Product Name': 'curd liter', 'Distribution Price': 62, 'Counter Price': 68 },
+    { Category: 'Curd & Paneer', 'Product Name': 'curd dtm', 'Distribution Price': 8, 'Counter Price': 10 },
+    { Category: 'Curd & Paneer', 'Product Name': '100 cups', 'Distribution Price': 8.15, 'Counter Price': 9 },
+    { Category: 'Curd & Paneer', 'Product Name': '170 cups', 'Distribution Price': 13.5, 'Counter Price': 15 },
+    { Category: 'Curd & Paneer', 'Product Name': '400 cup', 'Distribution Price': 29, 'Counter Price': 32 },
+    { Category: 'Curd & Paneer', 'Product Name': '1 litre tub', 'Distribution Price': 95, 'Counter Price': 95 },
+    { Category: 'Curd & Paneer', 'Product Name': '20 liter tub', 'Distribution Price': 1450, 'Counter Price': 1535 },
+    { Category: 'Curd & Paneer', 'Product Name': '10 liter tub', 'Distribution Price': 700, 'Counter Price': 730 },
+    { Category: 'Curd & Paneer', 'Product Name': '5 liter tub', 'Distribution Price': 350, 'Counter Price': 330 },
+    { Category: 'Curd & Paneer', 'Product Name': 'panner', 'Distribution Price': 370, 'Counter Price': 405 },
+    { Category: 'Curd & Paneer', 'Product Name': 'panner 500', 'Distribution Price': 185, 'Counter Price': 205 },
+    { Category: 'Curd & Paneer', 'Product Name': 'panner 200', 'Distribution Price': 80, 'Counter Price': 86 },
+    { Category: 'Ghee', 'Product Name': 'cow gee kg', 'Distribution Price': 670, 'Counter Price': 710 },
+    { Category: 'Ghee', 'Product Name': 'cowgee 500', 'Distribution Price': 335, 'Counter Price': 355 },
+    { Category: 'Ghee', 'Product Name': 'cow ghee200', 'Distribution Price': 135, 'Counter Price': 145 },
+    { Category: 'Ghee', 'Product Name': 'gee 500', 'Distribution Price': 350, 'Counter Price': 335 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'buns', 'Distribution Price': 8.25, 'Counter Price': 10 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': '400 bred', 'Distribution Price': 35, 'Counter Price': 40 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': '200 bred', 'Distribution Price': 17, 'Counter Price': 20 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'cup cace', 'Distribution Price': 32, 'Counter Price': 35 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'palem cace', 'Distribution Price': 27, 'Counter Price': 25 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'rusk', 'Distribution Price': 32, 'Counter Price': 35 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'osmaniya 20', 'Distribution Price': 17, 'Counter Price': 20 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'osmaniya 40', 'Distribution Price': 35, 'Counter Price': 40 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'osmaniya 60', 'Distribution Price': 54, 'Counter Price': 60 },
+    { Category: 'Breads Cakes & Biscuits', 'Product Name': 'osmaniya 120', 'Distribution Price': 110, 'Counter Price': 120 },
+    { Category: 'Sweets', 'Product Name': 'junnu', 'Distribution Price': 18, 'Counter Price': 20 },
+    { Category: 'Sweets', 'Product Name': 'misthidoi', 'Distribution Price': 13, 'Counter Price': 15 },
+    { Category: 'Sweets', 'Product Name': 'dood ped20', 'Distribution Price': 11, 'Counter Price': 12 },
+    { Category: 'Sweets', 'Product Name': 'bodam barfi', 'Distribution Price': 150, 'Counter Price': 160 },
+    { Category: 'Sweets', 'Product Name': 'dood peda 250', 'Distribution Price': 150, 'Counter Price': 160 },
+    { Category: 'Sweets', 'Product Name': 'khalakand', 'Distribution Price': 170, 'Counter Price': 180 },
+    { Category: 'Sweets', 'Product Name': 'milkcace 500', 'Distribution Price': 285, 'Counter Price': 310 },
+    { Category: 'Sweets', 'Product Name': 'myshorpac', 'Distribution Price': 150, 'Counter Price': 150 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'nuvvulu 200', 'Distribution Price': 100, 'Counter Price': 105 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'lemon', 'Distribution Price': 8.5, 'Counter Price': 10 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'manga', 'Distribution Price': 13.5, 'Counter Price': 15 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'zero', 'Distribution Price': 23, 'Counter Price': 25 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'spaicy chogodi', 'Distribution Price': 110, 'Counter Price': 110 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'spaicy chogodi', 'Distribution Price': 55, 'Counter Price': 50 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'ribbon pakodi', 'Distribution Price': 95, 'Counter Price': 105 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'ribbon pakodi', 'Distribution Price': 55, 'Counter Price': 50 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'jonna murukulu', 'Distribution Price': 105, 'Counter Price': 115 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'jonna murukulu', 'Distribution Price': 60, 'Counter Price': 55 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'kaju mixer 400', 'Distribution Price': 130, 'Counter Price': 145 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'kaju mixer200', 'Distribution Price': 68, 'Counter Price': 75 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'moong dal 400', 'Distribution Price': 110, 'Counter Price': 115 },
     { Category: 'Savory Snacks & Others', 'Product Name': 'moong dal 200', 'Distribution Price': 55, 'Counter Price': 60 },
-    { Category: 'Savory Snacks & Others', 'Product Name': 'dadar 400', 'Distribution Price': 60, 'Counter Price': 65 },
+    { Category: 'Savory Snacks & Others', 'Product Name': 'cron flakes', 'Distribution Price': 60, 'Counter Price': 60 },
 ];
 
 router.post('/import-pricelist', requireAuth, async (req, res) => {
     try {
         const batch = db.batch();
         const existingProductKeys = new Set<string>();
-        const categoryIdMap = new Map<string, string>(); // Maps category name to Firestore ID
 
         // Create categories
         const uniqueCategories = [...new Set(priceListData.map(item => item.Category))];
         for (const categoryName of uniqueCategories) {
             const normalizedName = normalizeString(categoryName);
+            const categorySlug = NAME_TO_SLUG[categoryName] || normalizedName;
             
-            // Check if category already exists in database
-            const existingSnapshot = await collections.categories
-                .where('name', '==', normalizedName)
-                .get();
+            // Check if category already exists in database using slug as doc ID
+            const categoryDoc = collections.categories.doc(categorySlug);
+            const categorySnapshot = await categoryDoc.get();
             
-            let categoryDoc;
-            if (existingSnapshot.empty) {
+            if (!categorySnapshot.exists) {
                 // Create new category if not exists
-                categoryDoc = collections.categories.doc();
                 batch.set(categoryDoc, {
-                    name: normalizedName,
+                    name: categoryName,
                     isActive: true,
                     createdAt: new Date().toISOString()
                 });
-                categoryIdMap.set(normalizedName, categoryDoc.id);
-            } else {
-                // Use existing category
-                categoryDoc = existingSnapshot.docs[0];
-                categoryIdMap.set(normalizedName, categoryDoc.id);
             }
         }
 
         // Create products
-        for (const item of priceListData) {
+        for (const [index, item] of priceListData.entries()) {
             const productName = normalizeString(item['Product Name']);
             const categoryName = normalizeString(item.Category);
-            const categoryId = categoryIdMap.get(categoryName)!;
-            const productKey = `${categoryName}-${productName}`;
+            const categoryId = NAME_TO_SLUG[item.Category] || categoryName;
+            const productKey = `${categoryName}-${productName}-${index}`;
 
             if (existingProductKeys.has(productKey)) {
                 continue; // Skip duplicates

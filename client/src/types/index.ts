@@ -70,7 +70,7 @@ export interface Purchase {
     purchase_date: string;
     expiry_date: string | null;
     created_at: string;
-    products?: { name: string; unit: string };
+    products?: { name: string; unit: string; distributionPrice?: number };
 }
 
 export interface Expense {

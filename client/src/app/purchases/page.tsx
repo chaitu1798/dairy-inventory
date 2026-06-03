@@ -533,7 +533,7 @@ export default function PurchasesPage() {
                                     <TableHead>Date & Invoice</TableHead>
                                     <TableHead>Product</TableHead>
                                     <TableHead className="text-right">Quantity</TableHead>
-                                    <TableHead className="text-right">Unit Price</TableHead>
+                                    <TableHead className="text-right">Distribution Price</TableHead>
                                     <TableHead className="text-right">Total Cost</TableHead>
                                     <TableHead>Expiry Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>

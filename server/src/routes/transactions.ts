@@ -49,7 +49,12 @@ router.get('/purchases', requireAuth, async (req, res) => {
             if (p.product_id) {
                 const prodDoc = await collections.products.doc(p.product_id).get();
                 if (prodDoc.exists) {
-                    p.products = { name: prodDoc.data()?.name, unit: prodDoc.data()?.unit };
+                    const prodData = prodDoc.data();
+                    p.products = { 
+                        name: prodData?.name, 
+                        unit: prodData?.unit,
+                        distributionPrice: prodData?.distribution_price || prodData?.distributionPrice || 0
+                    };
                 }
             }
         }
@@ -78,7 +83,7 @@ router.post('/purchases', requireAuth, validateRequest(PurchaseSchema), async (r
             return res.status(400).json({ error: 'Product not found' });
         }
 
-        const price = productDoc.data()?.cost_price || 0;
+        const price = productDoc.data()?.distribution_price || productDoc.data()?.distributionPrice || 0;
         const total = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
 
         const newPurchase = {
@@ -126,7 +131,7 @@ router.put('/purchases/:id', requireAuth, validateRequest(PurchaseSchema), async
             const pid = updates.product_id || currentDoc.data()?.product_id;
             const qty = updates.quantity !== undefined ? updates.quantity : currentDoc.data()?.quantity;
             const productDoc = await collections.products.doc(pid).get();
-            const price = productDoc.data()?.cost_price || 0;
+            const price = productDoc.data()?.distribution_price || productDoc.data()?.distributionPrice || 0;
             updates.total = qty * price;
             updates.price = price;
         }

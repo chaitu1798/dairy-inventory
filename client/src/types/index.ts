@@ -18,6 +18,11 @@ export interface Product {
     createdAt: string;
     updatedAt: string;
 
+    // Expiry tracking
+    track_expiry?: boolean;
+    expiry_date?: string;
+    expiry_days?: number;
+
     // Legacy fields for compatibility
     name?: string;
     categoryId?: string;

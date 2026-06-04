@@ -291,16 +291,18 @@ export default function PurchasesPage() {
             if (date) setValue('purchase_date', date);
 
             if (productName) {
-                const matchedProduct = allProducts.find(p =>
-                    p.name.toLowerCase().includes(productName.toLowerCase()) ||
-                    productName.toLowerCase().includes(p.name.toLowerCase())
-                );
+                const matchedProduct = allProducts.find(p => {
+                    const productNameLower = productName.toLowerCase();
+                    const pName = (p.name || p.productName || '').toLowerCase();
+                    return pName.includes(productNameLower) || productNameLower.includes(pName);
+                });
                 if (matchedProduct) {
                     const catId = getProductCategoryId(categoryOptions, matchedProduct) || 'products';
                     setSelectedCategoryId(catId);
                     setValue('categoryId', catId);
                     setValue('product_id', String(matchedProduct.id));
-                    toast.success(`Matched: ${matchedProduct.name}`);
+                    const displayName = matchedProduct.name || matchedProduct.productName || 'Product';
+                    toast.success(`Matched: ${displayName}`);
                 }
             }
             toast.success('Data extracted successfully. Please verify.');
@@ -680,7 +682,7 @@ export default function PurchasesPage() {
                                     label="Correct Product"
                                     value={selectedProductId}
                                     onChange={(e) => setSelectedProductId(e.target.value)}
-                                    options={allProducts.map((p: Product) => ({ value: String(p.id), label: p.name }))}
+                                    options={allProducts.map((p: Product) => ({ value: String(p.id), label: p.name || p.productName || 'Product' }))}
                                     placeholder="Confirm mapped product"
                                     className="bg-slate-50 border-none"
                                 />

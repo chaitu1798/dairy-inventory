@@ -43,6 +43,7 @@ import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 
 import { useCategories } from '../../context/CategoryContext';
+import { useProducts } from '../../context/ProductContext';
 import { getCategoryName, getCategoryOptions, getProductCategoryId } from '../../utils/categories';
 
 const productSchema = z.object({
@@ -79,9 +80,7 @@ type StockUpdateFormData = z.infer<typeof stockUpdateSchema>;
 export default function ProductsPage() {
     const { categories } = useCategories();
     const categoryOptions = getCategoryOptions(categories);
-    const [products, setProducts] = useState<Product[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const { products, loading, error, refreshProducts, updateProduct } = useProducts();
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
@@ -142,40 +141,23 @@ export default function ProductsPage() {
 
     const trackExpiry = watch('track_expiry');
 
-    const fetchProducts = useCallback(async (page = 1) => {
-        try {
-            setLoading(true);
-            let url = `/products?page=${page}&limit=${ITEMS_PER_PAGE}`;
-            if (searchQuery) url += `&search=${searchQuery}`;
-            if (categoryFilter !== 'all') url += `&categoryId=${categoryFilter}`;
-
-            const res = await api.get(url);
-            if (res.data.data) {
-                setProducts(
-                    [...res.data.data].sort((a: Product, b: Product) =>
-                        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-                    )
-                );
-                setTotalPages(res.data.totalPages);
-                setTotalItems(res.data.count);
-            } else {
-                setProducts(
-                    [...res.data].sort((a: Product, b: Product) =>
-                        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-                    )
-                );
-            }
-        } catch (err) {
-            setError('Failed to load products');
-            toast.error('Failed to load products');
-        } finally {
-            setLoading(false);
-        }
-    }, [searchQuery, categoryFilter]);
+    // Filter products locally based on search and category
+    const filteredProducts = products.filter(product => {
+        const productName = (product.name || product.productName || '').toLowerCase();
+        const matchesSearch = !searchQuery || productName.includes(searchQuery.toLowerCase());
+        const matchesCategory = categoryFilter === 'all' || product.categoryId === categoryFilter;
+        return matchesSearch && matchesCategory;
+    }).sort((a, b) => {
+        const aName = (a.name || a.productName || '');
+        const bName = (b.name || b.productName || '');
+        return aName.localeCompare(bName, undefined, { sensitivity: 'base' });
+    });
 
     useEffect(() => {
-        fetchProducts(currentPage);
-    }, [currentPage, fetchProducts]);
+        // Update total items when products change
+        setTotalItems(filteredProducts.length);
+        setTotalPages(Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+    }, [filteredProducts, ITEMS_PER_PAGE]);
 
     const onSubmit = async (data: ProductFormData) => {
         try {
@@ -185,11 +167,16 @@ export default function ProductsPage() {
             };
 
             if (isEditing && editId) {
-                await api.put(`/products/${editId}`, payload);
+                const response = await api.put(`/products/${editId}`, payload);
+                // Update product in context immediately
+                const updatedProduct = response.data[0] || { ...payload, id: editId };
+                updateProduct(editId, updatedProduct);
                 toast.success('Product updated successfully');
             } else {
-                await api.post('/products', payload);
+                const response = await api.post('/products', payload);
                 toast.success('Product created successfully');
+                // Refresh products to get new one
+                await refreshProducts();
             }
 
             reset({
@@ -205,7 +192,6 @@ export default function ProductsPage() {
             });
             setIsEditing(false);
             setEditId(null);
-            fetchProducts(currentPage);
         } catch (error: unknown) {
             console.warn('Error saving product:', error);
             const serverMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -241,7 +227,7 @@ export default function ProductsPage() {
         try {
             await api.delete(`/products/${deleteId}`);
             toast.success('Product deleted successfully');
-            fetchProducts(currentPage);
+            await refreshProducts();
         } catch (error: unknown) {
             console.warn('Error deleting product:', error);
             toast.error('Failed to delete product');
@@ -266,7 +252,7 @@ export default function ProductsPage() {
             
             if (response.data.productCreation) {
                 toast.success(response.data.productCreation.message);
-                fetchProducts(currentPage);
+                await refreshProducts();
             }
         } catch (error: unknown) {
             console.error('Error importing products:', error);
@@ -325,7 +311,7 @@ export default function ProductsPage() {
 
             toast.success(`Stock ${stockAction === 'in' ? 'added' : 'removed'} successfully`);
             setIsStockModalOpen(false);
-            fetchProducts(currentPage);
+            await refreshProducts();
         } catch (error: unknown) {
             console.warn('Error updating stock:', error);
             toast.error('Failed to update stock');

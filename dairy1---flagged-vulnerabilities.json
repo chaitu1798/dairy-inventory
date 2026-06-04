@@ -1,0 +1,26 @@
+{
+    "findings": [
+        {
+            "title": "Missing Admin Authorization: Any Authenticated User Can Access Administrative Endpoints",
+            "status": "fixed",
+            "commit_hash": "01910ce37d6e70921a00c0be84cc57db5703dc78",
+            "detected_at_pst": "2026-06-04T07:13:55.297109-08:00",
+            "reported_link": "",
+            "evidence": "All /admin/* endpoints (including /admin/backup, /admin/delete-data, /admin/import-pricelist, /admin/import-purchases, /admin/import-sales) use requireAuth middleware but do NOT check if the authenticated user is actually an admin. Any authenticated user can delete all products/categories/inventory, modify data, and import data.",
+            "severity": "critical",
+            "location": "server/src/routes/admin.ts",
+            "fixedAt": "2026-06-04T07:22:52.545576-08:00"
+        },
+        {
+            "title": "Overly Permissive Firestore Security Rules: Any Authenticated User Can Read/Write All Data",
+            "status": "fixed",
+            "commit_hash": "01910ce37d6e70921a00c0be84cc57db5703dc78",
+            "detected_at_pst": "2026-06-04T07:13:55.297109-08:00",
+            "reported_link": "",
+            "evidence": "firestore.rules allows any authenticated user read/write access to ALL Firestore documents with no restrictions.",
+            "severity": "critical",
+            "location": "firestore.rules",
+            "fixedAt": "2026-06-04T07:22:52.545576-08:00"
+        }
+    ]
+}

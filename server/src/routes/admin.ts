@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { collections, db } from '../firebase';
-import { requireAuth } from '../middleware/auth';
+import { requireAdmin } from '../middleware/auth';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 
@@ -95,7 +95,7 @@ const normalizeString = (str: string) => {
 };
 
 // --- STEP 1: BACKUP EXISTING DATA ---
-router.get('/backup', requireAuth, async (req, res) => {
+router.get('/backup', requireAdmin, async (req, res) => {
     try {
         const [products, categories, inventory, stockHistory] = await Promise.all([
             collections.products.get(),
@@ -145,7 +145,7 @@ const deleteCollection = async (collectionRef: FirebaseFirestore.CollectionRefer
     }
 };
 
-router.delete('/delete-data', requireAuth, async (req, res) => {
+router.delete('/delete-data', requireAdmin, async (req, res) => {
     try {
         await Promise.all([
             deleteCollection(collections.categories),
@@ -229,7 +229,7 @@ const priceListData = [
     { Category: 'Savory Snacks & Others', 'Product Name': 'cron flakes', 'Distribution Price': 60, 'Counter Price': 60 },
 ];
 
-router.post('/import-pricelist', requireAuth, async (req, res) => {
+router.post('/import-pricelist', requireAdmin, async (req, res) => {
     try {
         const batch = db.batch();
         const existingProductKeys = new Set<string>();
@@ -314,7 +314,7 @@ router.post('/import-pricelist', requireAuth, async (req, res) => {
 });
 
 // Get preview (returns sample price list data)
-router.get('/preview', requireAuth, async (req, res) => {
+router.get('/preview', requireAdmin, async (req, res) => {
     const uniqueCategories = [...new Set(priceListData.map(item => item.Category))];
     res.json({
         success: true,
@@ -324,7 +324,7 @@ router.get('/preview', requireAuth, async (req, res) => {
     });
 });
 
-router.post('/import-purchases', requireAuth, upload.fields([{ name: 'image' }, { name: 'csv' }]), async (req, res) => {
+router.post('/import-purchases', requireAdmin, upload.fields([{ name: 'image' }, { name: 'csv' }]), async (req, res) => {
     try {
         const batch = db.batch();
         let purchaseDate = req.body.purchaseDate || new Date().toISOString().split('T')[0];
@@ -416,7 +416,7 @@ router.post('/import-purchases', requireAuth, upload.fields([{ name: 'image' }, 
 });
 
 // Import Sales
-router.post('/import-sales', requireAuth, upload.single('csv'), async (req, res) => {
+router.post('/import-sales', requireAdmin, upload.single('csv'), async (req, res) => {
     try {
         const batch = db.batch();
         let saleDate = req.body.saleDate || new Date().toISOString().split('T')[0];

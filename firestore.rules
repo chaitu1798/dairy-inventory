@@ -1,8 +1,64 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Require authentication for all access
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is admin via custom claims, document, or email
+    function isAdmin() {
+      return request.auth.token.admin == true || 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Users collection (for admin flags)
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+    
+    // Products
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (get(/databases/$(database)/documents/products/$(productId)).data.createdBy == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+    }
+
+    // Categories
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Purchases
+    match /purchases/{purchaseId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Sales
+    match /sales/{saleId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Customers
+    match /customers/{customerId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Inventory
+    match /inventory/{inventoryId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Stock history
+    match /stockHistory/{historyId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Other collections
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuthenticated() && isAdmin();
     }
   }
 }

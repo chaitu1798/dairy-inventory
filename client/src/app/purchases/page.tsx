@@ -38,6 +38,7 @@ import { cn } from '../../lib/utils';
 import Modal from '../../components/ui/Modal';
 import { useFilteredProducts } from '../../hooks/useFilteredProducts';
 import { useCategories } from '../../context/CategoryContext';
+import { useProducts } from '../../context/ProductContext';
 import { getCategoryOptions, getProductCategoryId } from '../../utils/categories';
 
 const purchaseSchema = z.object({
@@ -56,7 +57,7 @@ export default function PurchasesPage() {
     const categoryOptions = getCategoryOptions(categories);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const { products: filteredProducts, loading: productsLoading } = useFilteredProducts(selectedCategoryId);
-    const [allProducts, setAllProducts] = useState<Product[]>([]); // For existing list display
+    const { products: allProducts } = useProducts(); // For existing list display, now from context!
     const [purchases, setPurchases] = useState<Purchase[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
@@ -105,23 +106,7 @@ export default function PurchasesPage() {
     const watchedProductId = watch('product_id');
     const watchedPurchaseDate = watch('purchase_date');
     const watchedCategoryId = watch('categoryId');
-
-    const fetchAllProducts = useCallback(async () => {
-        try {
-            const res = await api.get('/products?limit=1000');
-            if (res.data && res.data.data) {
-                setAllProducts(res.data.data);
-            } else if (Array.isArray(res.data)) {
-                setAllProducts(res.data);
-            } else {
-                setAllProducts([]);
-            }
-        } catch (error) {
-            console.warn('Error fetching products:', error);
-            toast.error('Failed to load products list for purchases');
-            setAllProducts([]);
-        }
-    }, []);
+    const watchedQuantity = watch('quantity');
 
     const fetchPurchases = useCallback(async (page = currentPage) => {
         setLoading(true);
@@ -143,10 +128,6 @@ export default function PurchasesPage() {
     }, [dateRange.startDate, dateRange.endDate, currentPage, ITEMS_PER_PAGE]);
 
     useEffect(() => {
-        fetchAllProducts();
-    }, [fetchAllProducts]);
-
-    useEffect(() => {
         fetchPurchases(currentPage);
     }, [dateRange, currentPage, fetchPurchases]);
 
@@ -155,6 +136,18 @@ export default function PurchasesPage() {
             setSelectedCategoryId(watchedCategoryId);
         }
     }, [watchedCategoryId]);
+
+    // Get current distribution price (supports both naming conventions)
+    const getDistributionPrice = (product: Product) => {
+        return product.distribution_price !== undefined 
+            ? Number(product.distribution_price) 
+            : product.distributionPrice !== undefined 
+                ? Number(product.distributionPrice) 
+                : 0;
+    };
+
+    const distributionPrice = selectedProduct ? getDistributionPrice(selectedProduct) : 0;
+    const totalCost = distributionPrice * (watchedQuantity || 0);
 
     useEffect(() => {
         if (watchedProductId) {
@@ -444,6 +437,20 @@ export default function PurchasesPage() {
                                         className="bg-white"
                                     />
                                 </div>
+
+                                {/* Real-time price preview */}
+                                {selectedProduct && (
+                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50/70 p-4 rounded-2xl border border-blue-100/70 space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[11px] font-extrabold text-blue-700 uppercase tracking-widest">Distribution Price</span>
+                                            <span className="text-sm font-black text-blue-900">₹{distributionPrice.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[11px] font-extrabold text-indigo-700 uppercase tracking-widest">Estimated Total</span>
+                                            <span className="text-xl font-black text-indigo-900">₹{totalCost.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {selectedProduct?.track_expiry && (
                                     <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 space-y-3">
